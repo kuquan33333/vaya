@@ -55,7 +55,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="foot-bot">
-          <span>© 2026 Vaya. Built for the Alibaba Cloud Hackathon.</span>
+          <span>© 2026 Vaya. Built for the AI Raiser</span>
           <button className="foot-top" onClick={goHome}>
             {t("foot_top")} <span aria-hidden="true">↑</span>
           </button>
