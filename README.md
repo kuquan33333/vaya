@@ -110,7 +110,7 @@ graph TB
     end
 
     subgraph AI["AI Layer — presentation only"]
-        H --> S[LLM Provider: Qwen / DeepSeek]
+        H --> S[LLM Provider: Gemini]
         CV --> S
         OM --> S
         L --> T[DashScope Embeddings]
@@ -162,7 +162,7 @@ sequenceDiagram
 | Language        | TypeScript 5.5 (strict mode)                                    |
 | Runtime         | Node.js 18+                                                     |
 | Styling         | Tailwind CSS 3.4 + CSS custom properties design system          |
-| AI/LLM          | OpenAI-compatible SDK — Alibaba DashScope (Qwen) or DeepSeek    |
+| AI/LLM          | Gemini   
 | Embeddings      | DashScope text-embedding-v3 (optional; RAG degrades gracefully) |
 | Validation      | Zod 4 (schema-first, trust boundary)                            |
 | Streaming       | Server-Sent Events (native ReadableStream)                      |
@@ -357,8 +357,7 @@ An OpenAI-compatible SDK behind an abstraction layer (`src/lib/ai/provider.ts`),
 
 | Provider       | Base URL                                         | Default Model   |
 | -------------- | ------------------------------------------------ | --------------- |
-| Qwen (default) | `dashscope-intl.aliyuncs.com/compatible-mode/v1` | `qwen-plus`     |
-| DeepSeek       | `api.deepseek.com/v1`                            | `deepseek-chat` |
+| Gemini       | `api.gemini.com/v1`                            | `gemini-chat` |
 
 ### Intent Extraction and the Trust Boundary
 
@@ -854,12 +853,10 @@ The `SurvivalChart` component adds interactive hover tooltips via React state ov
 | `DASHSCOPE_BASE_URL`        | No           | `dashscope-intl.aliyuncs.com/compatible-mode/v1` | Custom endpoint                       |
 | `DASHSCOPE_MODEL`           | No           | `qwen-plus`                                      | LLM model identifier                  |
 | `DASHSCOPE_EMBEDDING_MODEL` | No           | `text-embedding-v3`                              | Embedding model                       |
-| `LLM_PROVIDER`              | No           | `qwen`                                           | Provider switch: `qwen` or `deepseek` |
-| `DEEPSEEK_API_KEY`          | If deepseek  | —                                                | DeepSeek API key                      |
-| `DEEPSEEK_BASE_URL`         | No           | `api.deepseek.com/v1`                            | Custom endpoint                       |
-| `DEEPSEEK_MODEL`            | No           | `deepseek-chat`                                  | Model identifier                      |
+| `LLM_PROVIDER`              | No           | `qwen`                                           | Provider: `gemini` |
 
-Note: the same `DASHSCOPE_API_KEY` serves both the Qwen chat model and the embedding model. Without it, chat still works via DeepSeek (if configured) but RAG grounding silently disables — policy answers then report "not found in the documents" by design.
+
+Note: the same `DASHSCOPE_API_KEY` serves both the Qwen chat model and the embedding model. Without it, chat still works via gemini (if configured) but RAG grounding silently disables — policy answers then report "not found in the documents" by design.
 
 ### next.config.mjs
 
@@ -892,9 +889,9 @@ npm install
 Create `.env.local`:
 
 ```bash
-LLM_PROVIDER=deepseek            # or qwen
-DEEPSEEK_API_KEY=sk-your-key     # if deepseek
-DASHSCOPE_API_KEY=sk-your-key    # if qwen / for embeddings
+LLM_PROVIDER= gemini          # or qwen
+Gemini_API_KEY=sk-your-key     # 
+DASHSCOPE_API_KEY=sk-your-key    # 
 ```
 
 ### Development
@@ -930,7 +927,7 @@ The project deploys to Vercel with zero configuration. Serverless functions hand
 
 ### Production Checklist
 
-- [ ] LLM provider key configured (`DASHSCOPE_API_KEY` and/or `DEEPSEEK_API_KEY`)
+- [ ] LLM provider key configured 
 - [ ] `DASHSCOPE_API_KEY` set if RAG policy grounding is wanted
 - [ ] RAG chunks pre-embedded (`src/data/rag/chunks.json` exists) — optional; retrieval degrades gracefully without it
 - [ ] `reactStrictMode: true` enabled
