@@ -25,9 +25,12 @@ const STATIC_MIME_TYPES = {
 const ASSET_VERSION = "5212c33";
 
 function rewriteHtmlAssetUrls(html) {
-  return html.replace(/(\/_next\/static\/[^"'\s<>]+)(?=["'\s<>])/g, (asset) => (
-    asset + (asset.includes("?") ? "&" : "?") + "gateway=" + ASSET_VERSION
-  ));
+  return html.replace(/((?:\s|<)(?:src|href)=["'])(\/_next\/static\/[^"']+)(["'])/g, (
+    match,
+    prefix,
+    asset,
+    suffix,
+  ) => prefix + asset + (asset.includes("?") ? "&" : "?") + "gateway=" + ASSET_VERSION + suffix);
 }
 
 async function normalizeStaticAssetResponse(request, response) {
