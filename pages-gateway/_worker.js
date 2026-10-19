@@ -24,28 +24,37 @@ const STATIC_MIME_TYPES = {
 };
 const ASSET_VERSION = "5212c33";
 
-function rewriteHtmlAssetUrls(html) {
-  return html.replace(/((?:\s|<)(?:src|href)=["'])(\/_next\/static\/[^"']+)(["'])/g, (
-    match,
-    prefix,
-    asset,
-    suffix,
-  ) => prefix + asset + (asset.includes("?") ? "&" : "?") + "gateway=" + ASSET_VERSION + suffix);
+class StaticAssetAttributeRewriter {
+  constructor(attribute) {
+    this.attribute = attribute;
+  }
+
+  element(element) {
+    const asset = element.getAttribute(this.attribute);
+    if (!asset || !asset.startsWith("/_next/static/") || asset.includes("gateway=")) return;
+    element.setAttribute(
+      this.attribute,
+      asset + (asset.includes("?") ? "&" : "?") + "gateway=" + ASSET_VERSION,
+    );
+  }
 }
 
-async function normalizeStaticAssetResponse(request, response) {
+function normalizeStaticAssetResponse(request, response) {
   const currentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   if (currentType.startsWith("text/html")) {
     const headers = new Headers(response.headers);
     headers.set("Content-Type", "text/html; charset=utf-8");
     headers.set("Cache-Control", "no-store, must-revalidate");
     headers.delete("Content-Length");
-    const html = rewriteHtmlAssetUrls(await response.text());
-    return new Response(html, {
+    const htmlResponse = new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
       headers,
     });
+    return new HTMLRewriter()
+      .on("script", new StaticAssetAttributeRewriter("src"))
+      .on("link", new StaticAssetAttributeRewriter("href"))
+      .transform(htmlResponse);
   }
   if (currentType && !currentType.startsWith("application/octet-stream")) return response;
 
