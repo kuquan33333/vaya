@@ -1,5 +1,3 @@
-import type { R2Bucket } from "@cloudflare/workers-types";
-
 export interface StaffAccessRuntime {
   STAFF_ACCESS_TEAM_DOMAIN?: string;
   STAFF_ACCESS_AUD?: string;
@@ -108,5 +106,3 @@ export async function hashStaffSubject(subject: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(subject));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-
-export type StaffStorage = Pick<R2Bucket, "get" | "delete">;

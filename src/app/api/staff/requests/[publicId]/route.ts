@@ -52,6 +52,7 @@ export async function GET(
   if (!lead) return NextResponse.json({ error: "lead_not_found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   const documents = await db.prepare(
     `SELECT document_id, side, content_type, byte_size, sha256, status,
+            telegram_message_id, telegram_sent_at, error_message,
             expires_at, deleted_at, created_at
      FROM lead_documents WHERE lead_id = ?1 ORDER BY side`,
   ).bind(lead.lead_id).all<Record<string, unknown>>();
@@ -82,17 +83,14 @@ export async function POST(
   if (!lead) return NextResponse.json({ error: "lead_not_found" }, { status: 404 });
 
   if (body.status === "deleted") {
-    const documents = await db.prepare("SELECT object_key FROM lead_documents WHERE lead_id = ?1 AND status != 'deleted'").bind(lead.lead_id).all<{ object_key: string }>();
-    if (runtime.LEAD_DOCUMENTS) {
-      for (const document of documents.results) await runtime.LEAD_DOCUMENTS.delete(document.object_key);
-    }
+    const documents = await db.prepare("SELECT document_id FROM lead_documents WHERE lead_id = ?1 AND status != 'deleted'").bind(lead.lead_id).all<{ document_id: string }>();
     const now = new Date().toISOString();
     await db.batch([
       db.prepare("UPDATE leads SET status = 'deleted', updated_at = ?1 WHERE lead_id = ?2").bind(now, lead.lead_id),
       db.prepare("UPDATE lead_documents SET status = 'deleted', deleted_at = ?1 WHERE lead_id = ?2").bind(now, lead.lead_id),
       db.prepare("UPDATE consent_records SET revoked_at = COALESCE(revoked_at, ?1) WHERE lead_id = ?2").bind(now, lead.lead_id),
     ]);
-    await audit(db, staff, "lead.deleted", publicId, { documentCount: documents.results.length });
+    await audit(db, staff, "lead.deleted", publicId, { documentCount: documents.results.length, telegramRevocation: "not_guaranteed" });
   } else {
     await db.prepare("UPDATE leads SET status = ?1, updated_at = datetime('now') WHERE lead_id = ?2").bind(body.status, lead.lead_id).run();
     await audit(db, staff, "lead.status_changed", publicId, { status: body.status });

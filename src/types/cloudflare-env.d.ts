@@ -1,10 +1,9 @@
-import type { D1Database, Fetcher, Queue, R2Bucket, RateLimit } from "@cloudflare/workers-types";
+import type { D1Database, Fetcher, Queue, RateLimit } from "@cloudflare/workers-types";
 
 declare global {
   interface Env {
     ASSETS?: Fetcher;
     DB?: D1Database;
-    LEAD_DOCUMENTS?: R2Bucket;
     LEAD_QUEUE?: Queue<unknown>;
     LEAD_RATE_LIMIT?: RateLimit;
     CHAT_RATE_LIMIT?: RateLimit;

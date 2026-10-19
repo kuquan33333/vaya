@@ -84,7 +84,7 @@ export function clearStore(): void {
 
 /**
  * Compatibility no-op retained for the original ingestion API. Callers must
- * persist the source/embedding outside the Worker process (D1 or R2).
+ * persist the source/embedding in D1 rather than process-local memory.
  */
 export function saveStore(): void {}
 

@@ -1,0 +1,9 @@
+name = "vaytiendanang-pages-gateway"
+compatibility_date = "2026-10-19"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "."
+
+# The APP Service Binding is reconciled on the existing Pages project through
+# the Cloudflare Pages API. Production points to vaytiendanang; preview points
+# to vaytiendanang-staging. Keeping it out of this static file prevents a
+# staging deploy from accidentally rebinding the production Worker.

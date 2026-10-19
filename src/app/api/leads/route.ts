@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message === "DOCUMENT_UPLOADS_NOT_ENABLED") {
       return NextResponse.json({ error: "document_upload_disabled" }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
+    if (error instanceof Error && error.message === "DOCUMENT_CONSENT_REQUIRED") {
+      return NextResponse.json({ error: "telegram_document_consent_required" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
     console.error("[lead] create failed", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ error: "lead_storage_unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

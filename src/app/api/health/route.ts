@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { getCloudflareEnv } from "@/lib/cloudflare/env";
 import { documentUploadsEnabled } from "@/lib/leads/service";
+import { verifyTelegramConfiguration } from "@/lib/leads/telegram";
 
 export async function GET() {
   const runtime = getCloudflareEnv();
+  const telegramVerified = await verifyTelegramConfiguration(runtime);
   const checks = {
     database: Boolean(runtime.DB),
-    documentStorage: documentUploadsEnabled(runtime),
+    telegramDocuments: documentUploadsEnabled(runtime) && telegramVerified,
     leadQueue: Boolean(runtime.LEAD_QUEUE),
     llm: Boolean(runtime.DASHSCOPE_API_KEY || runtime.DEEPSEEK_API_KEY),
     ragEmbedding: Boolean(runtime.DASHSCOPE_API_KEY),
-    telegram: Boolean(runtime.TELEGRAM_BOT_TOKEN && runtime.TELEGRAM_CHAT_ID),
+    telegram: telegramVerified,
     turnstile: Boolean(runtime.TURNSTILE_SECRET_KEY),
     turnstileSiteKey: Boolean(runtime.TURNSTILE_SITE_KEY),
     zalo: Boolean(runtime.ZALO_CONTACT_URL),

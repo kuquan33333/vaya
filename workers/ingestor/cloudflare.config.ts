@@ -1,8 +1,13 @@
 import { bindings, defineConfig, defineWorker, triggers } from "cf/config";
 
+const workerName = process.env.CF_INGESTOR_WORKER_NAME ?? "vaytiendanang-ingestor";
+const databaseName = process.env.CF_D1_DATABASE_NAME ?? "vaytiendanang-db";
+const leadQueueName = process.env.CF_LEAD_QUEUE_NAME ?? "vaytiendanang-lead-notifications";
+const deadLetterQueueName = process.env.CF_LEAD_QUEUE_DLQ_NAME ?? "vaytiendanang-lead-notifications-dlq";
+
 export default defineConfig({
   worker: defineWorker({
-    name: "vaytiendanang-ingestor",
+    name: workerName,
     entrypoint: "./src/index.ts",
     compatibilityDate: "2026-10-19",
     compatibilityFlags: ["nodejs_compat"],
@@ -10,12 +15,12 @@ export default defineConfig({
       // 00:00 UTC = 07:00 Asia/Ho_Chi_Minh.
       triggers.scheduled({ schedule: "0 0 * * *" }),
       triggers.queue({
-        name: "vaytiendanang-lead-notifications",
+        name: leadQueueName,
         maxBatchSize: 10,
         maxBatchTimeout: 30,
         maxRetries: 5,
         retryDelay: 60,
-        deadLetterQueue: "vaytiendanang-lead-notifications-dlq",
+        deadLetterQueue: deadLetterQueueName,
       }),
     ],
     observability: {
@@ -25,9 +30,8 @@ export default defineConfig({
       logs: { enabled: true, invocationLogs: true, persist: true },
     },
     env: {
-      DB: bindings.d1({ name: "vaytiendanang-db" }),
-      LEAD_DOCUMENTS: bindings.r2({ name: "vaytiendanang-lead-documents" }),
-      LEAD_QUEUE: bindings.queue({ name: "vaytiendanang-lead-notifications" }),
+      DB: bindings.d1({ name: databaseName }),
+      LEAD_QUEUE: bindings.queue({ name: leadQueueName }),
       PUBLIC_SITE_URL: bindings.secret(),
       TELEGRAM_BOT_TOKEN: bindings.secret(),
       TELEGRAM_CHAT_ID: bindings.secret(),

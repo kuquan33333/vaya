@@ -52,10 +52,10 @@ Nhánh làm việc: `feat/vaytiendanang-cloudflare-full`
 
 ## Findings và kế hoạch migration không hồi quy
 
-1. **Runtime:** thay thế đường đọc/ghi filesystem trong RAG bằng D1/R2 hoặc build-time immutable fixture; route handler phải dùng Web APIs/bindings, không dựa vào Node process state.
+1. **Runtime:** thay thế đường đọc/ghi filesystem trong RAG bằng D1 hoặc build-time immutable fixture; route handler phải dùng Web APIs/bindings, không dựa vào Node process state.
 2. **Catalog:** tạo schema stable ID/provenance/rate basis/fees/promotion/status/confidence, seed/import giữ alias của các ID cũ. Các record legacy thiếu căn cứ sẽ `sample/quarantine`, không xếp hạng hay quảng cáo như verified.
 3. **Tính toán:** tách flat/original-principal, reducing-balance annuity/equal-principal, APR/EIR và fee thành hàm có unit test; giữ API shape cũ qua adapter.
 4. **UI:** đổi public brand sang `vaytiendanang`, giữ tất cả route/tool/modes; CTA mới đi vào form nội bộ; marketplace luôn có nhãn mô phỏng khi chưa có partner integration.
-5. **Leads/privacy:** thêm D1 transaction + idempotency/outbox; Turnstile/Origin/rate limit; R2 private document flow chỉ bật khi có cấu hình/consent hợp lệ; Telegram không nhận CCCD/full phone/ảnh.
+5. **Leads/privacy:** thêm D1 transaction + idempotency/outbox; Turnstile/Origin/rate limit; CCCD chỉ gửi trực tiếp Telegram sau kiểm tra cấu hình, token và consent riêng; không lưu bytes ảnh.
 6. **Crawler:** allowlist nguồn chính thức, robots/terms, bounded fetch/parse/validate/diff/quarantine/expiry/snapshot; không bypass chặn và không tự điền số liệu.
 7. **Deploy/QA:** vinext + Wrangler typed config, D1 migrations, cron/queue, GitHub Actions gates, unit/integration/Playwright tests; production deploy chỉ `READY_FOR_DEPLOYMENT` đến khi có Cloudflare credentials/live smoke.

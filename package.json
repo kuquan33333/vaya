@@ -16,7 +16,8 @@
     "build:vinext": "vite build",
     "start:vinext": "vite preview",
     "deploy:vinext": "vinext-cloudflare deploy",
-    "deploy:ingestor": "cd workers/ingestor && cf deploy --config cloudflare.config.ts",
+    "deploy:ingestor": "cd workers/ingestor && cf deploy",
+    "d1:migrate": "node scripts/d1-migrate.mjs",
     "catalog:review": "node scripts/catalog-review.mjs",
     "catalog:import": "node scripts/catalog-import.mjs import"
   },

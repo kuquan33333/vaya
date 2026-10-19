@@ -1,5 +1,6 @@
 import type { LeadInput } from "./schema";
 import { normalizeVietnamPhone } from "./schema";
+import { telegramConfigLooksValid } from "./telegram";
 
 interface Statement {
   bind(...values: unknown[]): Statement;
@@ -11,20 +12,8 @@ export interface LeadDatabase {
   batch(statements: Statement[]): Promise<unknown[]>;
 }
 
-export interface LeadObjectStorage {
-  put(
-    key: string,
-    value: ArrayBuffer,
-    options?: {
-      httpMetadata?: { contentType?: string };
-      customMetadata?: Record<string, string>;
-    },
-  ): Promise<unknown>;
-}
-
 export interface LeadRuntime {
   DB?: LeadDatabase;
-  LEAD_DOCUMENTS?: LeadObjectStorage;
   LEAD_QUEUE?: { send(body: unknown): Promise<unknown> };
   LEAD_RATE_LIMIT?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   TELEGRAM_BOT_TOKEN?: string;
@@ -51,6 +40,10 @@ export interface CreatedLead {
   notificationQueued: boolean;
   documentsEnabled: boolean;
   uploadTokens?: { front: string; back: string; expiresAt: string };
+}
+
+function hasTelegramDocumentConsent(input: LeadInput): boolean {
+  return input.consentDocumentUpload === true && input.consentTelegramDocument === true;
 }
 
 function uuid(): string {
@@ -123,8 +116,8 @@ export async function verifyDocumentUploadToken(
 export function documentUploadsEnabled(runtime: LeadRuntime): boolean {
   return Boolean(
     runtime.DOCUMENT_UPLOADS_ENABLED === "true" &&
-      runtime.LEAD_DOCUMENTS &&
-      runtime.DOCUMENT_UPLOAD_SIGNING_KEY,
+      runtime.DOCUMENT_UPLOAD_SIGNING_KEY &&
+      telegramConfigLooksValid(runtime),
   );
 }
 
@@ -174,7 +167,11 @@ export async function createLead(
   if (!runtime.DB) throw new Error("LEAD_DATABASE_NOT_CONFIGURED");
   const phoneE164 = normalizeVietnamPhone(input.phone);
   if (!phoneE164) throw new Error("INVALID_VIETNAM_PHONE");
-  if (input.consentDocumentUpload && !documentUploadsEnabled(runtime)) {
+  const documentConsent = hasTelegramDocumentConsent(input);
+  if (input.consentDocumentUpload && !documentConsent) {
+    throw new Error("DOCUMENT_CONSENT_REQUIRED");
+  }
+  if (documentConsent && !documentUploadsEnabled(runtime)) {
     throw new Error("DOCUMENT_UPLOADS_NOT_ENABLED");
   }
 
@@ -185,7 +182,7 @@ export async function createLead(
               EXISTS(
                 SELECT 1 FROM consent_records c
                 WHERE c.lead_id = l.lead_id
-                  AND c.consent_type = 'document_upload'
+                  AND c.consent_type = 'telegram_document'
                   AND c.granted = 1
                   AND c.revoked_at IS NULL
               ) AS document_consent
@@ -212,7 +209,7 @@ export async function createLead(
       notificationQueued: ["pending", "processing", "sent"].includes(existing.notification_status),
       documentsEnabled,
       uploadTokens:
-        documentsEnabled && existing.document_consent === 1 && runtime.DOCUMENT_UPLOAD_SIGNING_KEY
+        documentConsent && documentsEnabled && existing.document_consent === 1 && runtime.DOCUMENT_UPLOAD_SIGNING_KEY
           ? {
               front: await createDocumentUploadToken(existing.lead_id, "front", uploadExpiry, runtime.DOCUMENT_UPLOAD_SIGNING_KEY),
               back: await createDocumentUploadToken(existing.lead_id, "back", uploadExpiry, runtime.DOCUMENT_UPLOAD_SIGNING_KEY),
@@ -274,28 +271,36 @@ export async function createLead(
       ),
     runtime.DB
       .prepare(
-        `INSERT INTO consent_records
+      `INSERT INTO consent_records
           (consent_id, lead_id, consent_type, policy_version, granted,
            ip_hash, user_agent_hash, granted_at)
-         VALUES (?, ?, 'contact', 'privacy-v1', 1, ?, ?, ?)`,
+         VALUES (?, ?, 'contact', 'privacy-v2', 1, ?, ?, ?)`,
       )
       .bind(uuid(), leadId, ipHash, userAgentHash, now),
     runtime.DB
       .prepare(
-        `INSERT INTO consent_records
+      `INSERT INTO consent_records
           (consent_id, lead_id, consent_type, policy_version, granted,
            ip_hash, user_agent_hash, granted_at)
-         VALUES (?, ?, 'processing_notice', 'privacy-v1', 1, ?, ?, ?)`,
+         VALUES (?, ?, 'processing_notice', 'privacy-v2', 1, ?, ?, ?)`,
       )
       .bind(uuid(), leadId, ipHash, userAgentHash, now),
-    ...(input.consentDocumentUpload
+    ...(documentConsent
       ? [
           runtime.DB
             .prepare(
               `INSERT INTO consent_records
                 (consent_id, lead_id, consent_type, policy_version, granted,
                  ip_hash, user_agent_hash, granted_at)
-               VALUES (?, ?, 'document_upload', 'privacy-v1', 1, ?, ?, ?)`,
+               VALUES (?, ?, 'document_upload', 'privacy-v2', 1, ?, ?, ?)`,
+            )
+            .bind(uuid(), leadId, ipHash, userAgentHash, now),
+          runtime.DB
+            .prepare(
+              `INSERT INTO consent_records
+                (consent_id, lead_id, consent_type, policy_version, granted,
+                 ip_hash, user_agent_hash, granted_at)
+               VALUES (?, ?, 'telegram_document', 'privacy-v2', 1, ?, ?, ?)`,
             )
             .bind(uuid(), leadId, ipHash, userAgentHash, now),
         ]
@@ -329,7 +334,7 @@ export async function createLead(
 
   const documentsEnabled = documentUploadsEnabled(runtime);
   const uploadExpiry = Date.now() + 30 * 60 * 1000;
-  const uploadTokens = documentsEnabled && runtime.DOCUMENT_UPLOAD_SIGNING_KEY
+  const uploadTokens = documentConsent && documentsEnabled && runtime.DOCUMENT_UPLOAD_SIGNING_KEY
     ? {
         front: await createDocumentUploadToken(leadId, "front", uploadExpiry, runtime.DOCUMENT_UPLOAD_SIGNING_KEY),
         back: await createDocumentUploadToken(leadId, "back", uploadExpiry, runtime.DOCUMENT_UPLOAD_SIGNING_KEY),

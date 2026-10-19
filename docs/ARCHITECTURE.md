@@ -11,7 +11,7 @@ Browser
 Cloudflare Worker (Vinext)
   ├─ D1: source registry, products, rates, review queue, leads, audit/outbox
   ├─ D1: verified policy_chunks and immutable rate_history snapshots
-  ├─ R2 private: optional document objects
+  ├─ Telegram Bot: direct CCCD sendDocument after separate consent
   └─ Queue binding: notification delivery
 
 Ingestor Worker (cron)
@@ -46,8 +46,13 @@ cấu hình và bắt buộc idempotency key. D1 batch ghi lead, consent, outbox
 audit. Queue chỉ chuyển `notificationId`; ingestor đọc payload đã redacted từ
 outbox. Telegram retry tối đa năm lần rồi `dead_letter`.
 
-R2 không public. Upload token là HMAC có side (`front`/`back`), lead id và hạn
-30 phút. API không trả URL public và không gửi object key vào Telegram.
+CCCD upload token là HMAC có side (`front`/`back`), lead id và hạn 30 phút.
+API kiểm tra bot token/chat bằng `getMe` + `getChat` trước khi đọc multipart;
+bytes gốc được gửi trực tiếp bằng `sendDocument`, chờ `ok=true` và
+`message_id`, rồi mới đánh dấu `sent`. D1 chỉ lưu content type, kích thước,
+SHA-256, message/file id và trạng thái; không lưu bytes hoặc object key.
+Telegram Bot không mã hóa đầu cuối, nên thao tác xóa chỉ là best-effort và
+không bảo đảm thu hồi ảnh đã gửi.
 
 ## RAG và review không có Admin UI
 
@@ -68,5 +73,5 @@ auto-publish từ observation.
 
 Telegram chỉ link đến một hồ sơ opaque `/staff/requests/<publicId>`. Trang này
 không liệt kê lead; Cloudflare Access bảo vệ ở edge và API còn tự xác minh
-Access JWT/audience/issuer. Staff có thể đổi status hoặc thu hồi/xóa; cron
-ingestor xóa object R2 hết hạn theo retention mặc định 30 ngày.
+Access JWT/audience/issuer. Staff có thể đổi status hoặc thu hồi/xóa metadata;
+cron ingestor dọn metadata D1 hết hạn, không tuyên bố đã xóa ảnh Telegram.

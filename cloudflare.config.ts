@@ -1,8 +1,13 @@
 import { bindings, defineConfig, defineWorker } from "cf/config";
 
+const workerName = process.env.CF_APP_WORKER_NAME ?? "vaytiendanang";
+const databaseName = process.env.CF_D1_DATABASE_NAME ?? "vaytiendanang-db";
+const leadQueueName = process.env.CF_LEAD_QUEUE_NAME ?? "vaytiendanang-lead-notifications";
+const rateLimitSuffix = process.env.CF_RATE_LIMIT_SUFFIX ?? "";
+
 export default defineConfig({
   worker: defineWorker({
-    name: "vaytiendanang",
+    name: workerName,
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-19",
     compatibilityFlags: ["nodejs_compat"],
@@ -19,12 +24,14 @@ export default defineConfig({
     },
     env: {
       ASSETS: bindings.assets(),
-      DB: bindings.d1({ name: "vaytiendanang-db" }),
-      LEAD_QUEUE: bindings.queue({ name: "vaytiendanang-lead-notifications" }),
-      LEAD_RATE_LIMIT: bindings.rateLimit({ namespace: "vaytiendanang-leads", simple: { limit: 5, period: 60 } }),
-      CHAT_RATE_LIMIT: bindings.rateLimit({ namespace: "vaytiendanang-chat", simple: { limit: 20, period: 60 } }),
+      DB: bindings.d1({ name: databaseName }),
+      LEAD_QUEUE: bindings.queue({ name: leadQueueName }),
+      LEAD_RATE_LIMIT: bindings.rateLimit({ namespace: `vaytiendanang-leads${rateLimitSuffix}`, simple: { limit: 5, period: 60 } }),
+      CHAT_RATE_LIMIT: bindings.rateLimit({ namespace: `vaytiendanang-chat${rateLimitSuffix}`, simple: { limit: 20, period: 60 } }),
       LLM_PROVIDER: bindings.text("qwen"),
-      DOCUMENT_UPLOADS_ENABLED: bindings.text("false"),
+      // Telegram is the only document delivery channel. The route still
+      // fails closed until the bot token, chat id and signing key are set.
+      DOCUMENT_UPLOADS_ENABLED: bindings.text("true"),
       DASHSCOPE_API_KEY: bindings.secret(),
       DASHSCOPE_BASE_URL: bindings.secret(),
       DASHSCOPE_MODEL: bindings.secret(),

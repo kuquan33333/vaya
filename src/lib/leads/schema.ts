@@ -17,6 +17,7 @@ export const LeadInputSchema = z.object({
   consentContact: z.literal(true),
   consentProcessingNotice: z.literal(true),
   consentDocumentUpload: z.boolean().default(false),
+  consentTelegramDocument: z.boolean().default(false),
   turnstileToken: z.string().trim().max(2_048).optional().nullable(),
 });
 

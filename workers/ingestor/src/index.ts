@@ -1,9 +1,8 @@
-import type { D1Database, MessageBatch, Queue, R2Bucket } from "@cloudflare/workers-types";
+import type { D1Database, MessageBatch, Queue } from "@cloudflare/workers-types";
 import { fetchSource, type CrawlSource } from "./crawler";
 
 interface IngestorEnv {
   DB: D1Database;
-  LEAD_DOCUMENTS?: R2Bucket;
   LEAD_QUEUE: Queue<QueueMessage>;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
@@ -258,16 +257,14 @@ async function drainCrawlAlerts(env: IngestorEnv): Promise<void> {
   for (const row of rows.results) await processCrawlAlert(env, row.alert_id);
 }
 
-async function purgeExpiredDocuments(env: IngestorEnv): Promise<void> {
-  if (!env.LEAD_DOCUMENTS) return;
+async function purgeExpiredDocumentMetadata(env: IngestorEnv): Promise<void> {
   const expired = await env.DB.prepare(
-    `SELECT document_id, object_key FROM lead_documents
-     WHERE status IN ('authorized', 'uploaded', 'quarantined')
+    `SELECT document_id FROM lead_documents
+     WHERE status IN ('pending', 'sent', 'failed')
        AND expires_at IS NOT NULL AND expires_at <= datetime('now')
      LIMIT 100`,
-  ).all<{ document_id: string; object_key: string }>();
+  ).all<{ document_id: string }>();
   for (const document of expired.results) {
-    await env.LEAD_DOCUMENTS.delete(document.object_key);
     await env.DB.prepare(
       `UPDATE lead_documents SET status = 'deleted', deleted_at = datetime('now')
        WHERE document_id = ?1`,
@@ -282,7 +279,7 @@ const worker = {
         await runCrawler(env);
         await drainOutbox(env);
         await drainCrawlAlerts(env);
-        await purgeExpiredDocuments(env);
+        await purgeExpiredDocumentMetadata(env);
       })(),
     );
   },

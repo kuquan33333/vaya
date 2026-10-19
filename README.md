@@ -36,12 +36,13 @@ npm run build:vinext
 
 - Frontend/API: Next App Router chạy qua Vinext trên Cloudflare Worker.
 - D1: catalog, provenance, review queue, leads, consent, outbox và audit.
-- R2 private: tài liệu tùy chọn, chỉ bật khi có consent và signing key.
+- Telegram Bot `sendDocument`: CCCD tùy chọn được gửi trực tiếp sau consent riêng;
+  D1 chỉ lưu metadata giao nhận, không lưu bytes ảnh.
 - Queue: outbox lead, retry và dead-letter.
 - Worker ingestor: robots/terms gate, crawler có ETag/Last-Modified, observation
   bất biến và human review; không tự publish lãi suất.
-- Telegram: chỉ nhận mã lead và metadata tối thiểu, không nhận họ tên, số điện
-  thoại, ghi chú hay tài liệu.
+- Telegram: nhận mã lead/metadata đã loại PII; chỉ nhận ảnh CCCD khi khách đồng ý
+  riêng. Telegram Bot không mã hóa đầu cuối và không bảo đảm thu hồi ảnh đã gửi.
 
 Chi tiết nằm trong:
 
@@ -57,7 +58,7 @@ Chi tiết nằm trong:
 ## Deploy
 
 Deploy production chạy từ nhánh `master` qua GitHub Actions sau khi validation
-pass. Tài khoản Cloudflare, D1/R2/Queue, secrets và quyền Telegram không chứa
+pass. Tài khoản Cloudflare, D1/Queue, secrets và quyền Telegram không chứa
 trong repository. Xem [CLOUDFLARE_DEPLOY.md](docs/CLOUDFLARE_DEPLOY.md).
 
 ## Giấy phép

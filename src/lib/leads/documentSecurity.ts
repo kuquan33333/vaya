@@ -118,7 +118,7 @@ function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
   return result;
 }
 
-/** Remove common EXIF/XMP/text metadata before an image is written to R2. */
+/** Optional metadata sanitizer retained for callers that explicitly need it. */
 export function stripImageMetadata(contentType: string, bytes: Uint8Array): Uint8Array | null {
   if (contentType === "image/jpeg") return stripJpegMetadata(bytes);
   if (contentType === "image/png") return stripPngMetadata(bytes);

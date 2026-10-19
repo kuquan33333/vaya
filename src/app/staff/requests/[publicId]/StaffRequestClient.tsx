@@ -27,6 +27,9 @@ type Document = {
   byte_size: number;
   sha256: string;
   status: string;
+  telegram_message_id: number | null;
+  telegram_sent_at: string | null;
+  error_message: string | null;
   expires_at: string | null;
   deleted_at: string | null;
   created_at: string;
@@ -112,10 +115,11 @@ export default function StaffRequestClient({ publicId }: { publicId: string }) {
           </section>
         </div>
         <section className="staff-card">
-          <h2>Tài liệu tùy chọn</h2>
-          {documents.length === 0 ? <p>Khách chưa tải tài liệu.</p> : <div className="staff-documents">{documents.map((document) => <div key={document.document_id}><span>CCCD mặt {document.side === "front" ? "trước" : "sau"} · {document.status}</span>{document.status !== "deleted" && document.status !== "quarantined" && <a className="btn btn-ghost btn-sm" href={`/api/staff/requests/${encodeURIComponent(publicId)}/documents/${document.side}`}>Tải qua Access</a>}</div>)}</div>}
+          <h2>CCCD đã gửi Telegram</h2>
+          <p className="form-footnote">Worker không lưu bytes ảnh và không có nút tải lại. Telegram Bot không mã hóa đầu cuối; việc xóa trong hệ thống không bảo đảm thu hồi ảnh đã gửi.</p>
+          {documents.length === 0 ? <p>Khách chưa gửi tài liệu.</p> : <div className="staff-documents">{documents.map((document) => <div key={document.document_id}><span>CCCD mặt {document.side === "front" ? "trước" : "sau"} · {document.status} · {document.byte_size.toLocaleString("vi-VN")} bytes</span><small>{document.telegram_sent_at ? `Đã xác nhận lúc ${new Date(document.telegram_sent_at).toLocaleString("vi-VN")}` : document.error_message ?? "Chưa có xác nhận Telegram"}</small></div>)}</div>}
         </section>
-        <button className="btn btn-danger btn-sm" onClick={() => { if (window.confirm("Xóa hồ sơ và tài liệu?")) void updateStatus("deleted"); }}>Thu hồi và xóa hồ sơ</button>
+        <button className="btn btn-danger btn-sm" onClick={() => { if (window.confirm("Xóa hồ sơ và metadata tài liệu? Ảnh đã gửi tới Telegram có thể không thu hồi được.")) void updateStatus("deleted"); }}>Thu hồi metadata và xóa hồ sơ</button>
       </div>
     </main>
   );

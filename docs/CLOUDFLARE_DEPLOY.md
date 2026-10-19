@@ -1,127 +1,108 @@
 # Deploy Cloudflare từ GitHub
 
-## Tài nguyên cần tạo
+## Kiến trúc production
 
-Tạo hoặc liên kết các resource sau trong đúng account:
+- `vaytiendanang` là Worker chạy Next.js/Vinext, giữ toàn bộ UI, AI, D1 và
+  API.
+- `vaytiendanang-ingestor` là Worker cron/Queue cho crawler, outbox Telegram
+  và dead-letter queue.
+- Pages project hiện hữu `vaytiendanang` (`vaytiendanang.pages.dev`) chỉ là
+  gateway Pages Functions. Gateway dùng Service Binding `APP` tới Worker
+  `vaytiendanang`; không tạo Pages project mới.
+- D1 `vaytiendanang-db` lưu catalog/provenance/review/lead/consent/audit và
+  metadata giao CCCD. Queue `vaytiendanang-lead-notifications` có DLQ tương
+  ứng.
+- Không dùng R2. CCCD được kiểm tra rồi gửi trực tiếp bằng Telegram Bot
+  `sendDocument`; bytes ảnh không đi vào D1, Worker storage hay object storage.
 
-- Worker `vaytiendanang`;
-- Worker `vaytiendanang-ingestor`;
-- D1 `vaytiendanang-db`;
-- R2 `vaytiendanang-lead-documents` (private);
-- Queue `vaytiendanang-lead-notifications` và DLQ tương ứng.
+## Secrets và quyền cần cung cấp
 
-Migration `0001`–`0007` tạo cả `policy_chunks`, `rate_history` và crawler alert
-outbox; không seed lãi suất hay banner giả.
+GitHub Actions production/staging cần:
 
-Tên binding đã khai báo trong `cloudflare.config.ts` và
-`workers/ingestor/cloudflare.config.ts`. Nếu account dùng tên khác, sửa cả
-config và tài liệu trước khi migrate.
-
-## Secrets/permissions cần cung cấp
-
-GitHub Actions cần repository secrets:
-
-- `CLOUDFLARE_API_TOKEN`: token đủ quyền deploy Worker, D1 migration, R2/Queue
-  binding trong account đích;
+- `CLOUDFLARE_API_TOKEN`: Workers Scripts, Pages Deployments/Functions, D1
+  query/migration, Queue và Pages project configuration trong account đích;
 - `CLOUDFLARE_ACCOUNT_ID`;
-- `CLOUDFLARE_D1_DATABASE_ID`: database ID thật của D1 `vaytiendanang-db`.
+- `CLOUDFLARE_D1_DATABASE_ID` của D1 `vaytiendanang-db`;
+- `PUBLIC_SITE_URL` trỏ tới `https://vaytiendanang.pages.dev` hoặc URL production
+  đang được dùng để health gate.
 
-Production Worker cần cấu hình:
+Runtime app Worker cần:
 
-- `DASHSCOPE_API_KEY` cho embedding RAG (bắt buộc), cùng
-  `DASHSCOPE_EMBEDDING_MODEL`; thêm `DASHSCOPE_API_KEY` hoặc
-  `DEEPSEEK_API_KEY` cho chat, cùng model/base URL tương ứng;
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
+- `DASHSCOPE_API_KEY`, `DASHSCOPE_EMBEDDING_MODEL` và model/base URL tương ứng;
+  hoặc DeepSeek cho chat theo cấu hình;
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` và
+  `DOCUMENT_UPLOAD_SIGNING_KEY`;
 - `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`;
-- `DOCUMENT_UPLOAD_SIGNING_KEY` chỉ khi bật upload;
-- `DOCUMENT_UPLOADS_ENABLED=false` mặc định;
-- `ZALO_CONTACT_URL` là URL HTTPS thật để health gate xác nhận CTA liên hệ;
-- `PUBLIC_SITE_URL` để link hồ sơ nội bộ trong Telegram;
-- `STAFF_ACCESS_TEAM_DOMAIN` và `STAFF_ACCESS_AUD` cho Cloudflare Access;
-- `CRAWLER_TRIGGER_TOKEN` nếu cần trigger crawler thủ công đã xác thực.
-- `CLOUDFLARE_D1_DATABASE_ID` không đưa vào client.
+- `ZALO_CONTACT_URL` là HTTPS thật;
+- `STAFF_ACCESS_TEAM_DOMAIN`, `STAFF_ACCESS_AUD`;
+- `PUBLIC_SITE_URL`.
 
-D1 migration CLI nhận database ID, không nhận binding name. Ingestor cũng cần
-các secret runtime `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
-`PUBLIC_SITE_URL` và `CRAWLER_TRIGGER_TOKEN` (nếu dùng trigger thủ công); app
-Worker cần các secret AI/lead/Access tương ứng ở trên.
+Ingestor cần `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `PUBLIC_SITE_URL` và
+`CRAWLER_TRIGGER_TOKEN` nếu dùng trigger thủ công. Không đặt secret trong
+`NEXT_PUBLIC_*`, source, migration, log hoặc caption chứa PII.
 
-Không đặt secret vào `NEXT_PUBLIC_*`, source code, migration, log hoặc Telegram.
+Telegram phải cho bot truy cập chat đích. Route CCCD gọi `getMe` và `getChat`
+trước khi đọc multipart; token/chat không hợp lệ thì trả lỗi và không nhận ảnh.
+Bot Telegram không mã hóa đầu cuối; ảnh sau khi gửi không bảo đảm thu hồi hoàn
+toàn.
 
-## Migration và deploy thủ công
+## Migration và deploy
 
-Sau khi D1 đã tồn tại, chạy từ root repository:
+Workflow `.github/workflows/deploy-cloudflare.yml` chạy một pipeline gồm
+validation, D1 migration, app Worker, ingestor Worker, Pages gateway và smoke
+health. `staging` dùng environment/Worker target riêng; production chỉ chạy khi
+push `master` hoặc được gọi thủ công. Mọi binding Pages đều trỏ vào project
+`vaytiendanang` hiện hữu.
+
+Các bước thủ công tương đương:
 
 ```bash
 npm ci
-export CLOUDFLARE_D1_DATABASE_ID=<d1-database-id>
-npx cf d1 migrations apply "$CLOUDFLARE_D1_DATABASE_ID" --remote
-npx cf deploy --config cloudflare.config.ts
-(cd workers/ingestor && npx cf deploy --config cloudflare.config.ts)
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run build:vinext
+npx cf deploy
+(cd workers/ingestor && npx cf deploy)
+node scripts/configure-pages-gateway.mjs
+node scripts/deploy-pages-gateway.mjs
 ```
 
-R2 không bật public bucket/r2.dev. Tạo Access application/policy allowlist cho
-`/staff/*` và `/api/staff/*`, rồi đặt team domain + application audience vào
-`STAFF_ACCESS_TEAM_DOMAIN`/`STAFF_ACCESS_AUD`. Telegram link sẽ mở đúng một
-hồ sơ opaque, không có danh sách Admin.
+Sau deploy, Pages project phải có Service Binding:
 
-Chỉ bật một `data_sources.crawl_enabled` sau khi nhân sự đã kiểm tra và ghi
-`robots_status='allowed'`, `terms_status='allowed'`. Seed provider registry
-không phải seed rate.
+```text
+APP -> service vaytiendanang
+```
 
-Trigger crawl thủ công (không public nếu thiếu token):
+Không thay thế bằng URL fetch công khai và không tạo project Pages thứ hai.
+
+## Dữ liệu crawler và catalog
+
+Chỉ bật `data_sources.crawl_enabled` sau khi reviewer ghi
+`robots_status='allowed'`, `terms_status='allowed'`. Observation mới đi qua
+review queue; không tự publish rate/product/promotion/banner.
+
+Trigger crawler thủ công (nếu đã cấu hình token):
 
 ```bash
 curl -fsS -X POST https://<ingestor-domain>/internal/crawl \
   -H "Authorization: Bearer $CRAWLER_TRIGGER_TOKEN"
 ```
 
-Endpoint này chỉ nhận token secret của ingestor, không có UI/admin listing và
-không bypass robots/terms. Cron vẫn là luồng mặc định.
-
-Review observation không qua Admin UI:
+## Smoke test bắt buộc
 
 ```bash
-CATALOG_REVIEW_ACTOR=ops@example.test npm run catalog:review -- approve --review-id <id>
-CATALOG_REVIEW_ACTOR=ops@example.test npm run catalog:review -- reject --review-id <id>
-CATALOG_REVIEW_ACTOR=ops@example.test npm run catalog:review -- publish \
-  --review-id <id> --entity-type product --entity-id <product-id>
+curl -i https://vaytiendanang.pages.dev/
+curl -i https://vaytiendanang.pages.dev/api/health
+curl -i https://vaytiendanang.pages.dev/api/catalog
 ```
 
-Các lệnh trên cần `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` và
-`CLOUDFLARE_D1_DATABASE_ID`, chỉ cho phép publish entity khớp review item đã
-approved và ghi audit. `product_term` và `rate_history` cũng chỉ được ghi
-vào bảng canonical sau khi publish. Reviewer vẫn phải đối chiếu đầy đủ source,
-basis, phí và post-promo trước khi approve.
+`/api/health` chỉ HTTP 200 khi D1, Queue, chat/embedding AI, Telegram
+(`getMe/getChat`), Turnstile, Zalo, Public URL và Cloudflare Access đều đã cấu
+hình. Health degraded là failure gate, không được báo production hoàn tất.
+Catalog rỗng là trạng thái an toàn nếu chưa có dữ liệu verified.
 
-Nhập một batch dữ liệu được cung cấp hợp pháp (luôn ở quarantine):
-
-```bash
-CATALOG_IMPORT_ACTOR=ops npm run catalog:import -- --file ./batch.json
-```
-
-Sau khi review source/provider, dùng `activate-provider` để mở provider và
-`enable-source` chỉ khi robots + terms đã được ghi là `allowed`. Product/rate/
-promotion/banner vẫn phải publish riêng từ review item tương ứng.
-
-## GitHub Actions
-
-`.github/workflows/deploy-cloudflare.yml` chạy lint, typecheck, unit tests và
-hai build. Job production chỉ chạy khi push vào `master`; pull request chỉ
-chạy validation, không thay đổi Cloudflare. Production health gate yêu cầu
-`PUBLIC_SITE_URL`, nên workflow không thể vô tình báo deploy thành công khi
-chưa có URL để kiểm tra.
-
-## Kiểm tra sau deploy
-
-```bash
-curl -fsS https://<domain>/api/health
-curl -fsS https://<domain>/api/catalog
-```
-
-`/api/health` chỉ trả HTTP 200/ `ok` khi các thành phần production bắt buộc
-(D1, Queue, chat + embedding AI, Telegram, Turnstile, Zalo, Public URL và
-Cloudflare Access) đã cấu hình; R2 document là tùy chọn và mặc định tắt.
-Catalog rỗng là trạng thái an toàn cho đến khi record được review và publish.
-Kiểm tra Cloudflare Logs, D1 `notification_outbox` và Queue DLQ sau lead test
-thật.
+Lead/CCCD thật cần kiểm thử với consent, upload token, cả hai mặt, định dạng/
+dung lượng sai và Telegram response lỗi. Không dùng ảnh hoặc Telegram giả để
+thay cho smoke test production.
