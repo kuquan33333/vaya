@@ -22,9 +22,28 @@ const STATIC_MIME_TYPES = {
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
 };
+const ASSET_VERSION = "5212c33";
 
-function normalizeStaticAssetResponse(request, response) {
+function rewriteHtmlAssetUrls(html) {
+  return html.replace(/(\/_next\/static\/[^"'\s<>]+)(?=["'\s<>])/g, (asset) => (
+    asset + (asset.includes("?") ? "&" : "?") + "gateway=" + ASSET_VERSION
+  ));
+}
+
+async function normalizeStaticAssetResponse(request, response) {
   const currentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (currentType.startsWith("text/html")) {
+    const headers = new Headers(response.headers);
+    headers.set("Content-Type", "text/html; charset=utf-8");
+    headers.set("Cache-Control", "no-store, must-revalidate");
+    headers.delete("Content-Length");
+    const html = rewriteHtmlAssetUrls(await response.text());
+    return new Response(html, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
   if (currentType && !currentType.startsWith("application/octet-stream")) return response;
 
   const pathname = new URL(request.url).pathname.toLowerCase();
