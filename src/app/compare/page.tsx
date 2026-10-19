@@ -1,12 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
-import ComparePage from "@/components/ComparePage";
+import VerifiedComparePage from "@/components/VerifiedComparePage";
 
 export default function Compare() {
   return (
     <Suspense fallback={null}>
-      <ComparePage />
+      <VerifiedComparePage />
     </Suspense>
   );
 }

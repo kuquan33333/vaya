@@ -16,6 +16,7 @@ import type {
   OfferPricing,
 } from "./offerContext";
 import type { ApiLang } from "@/lib/i18n/apiMessages";
+import { getRuntimeConfig } from "@/lib/cloudflare/runtime";
 
 /* ================================================================
    Provider-agnostic interfaces
@@ -72,37 +73,21 @@ export interface LLMProvider {
    Client factory — switchable via LLM_PROVIDER env var
    ================================================================ */
 
-const DASHSCOPE_BASE_URL =
-  "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
+export class LLMNotConfiguredError extends Error {
+  constructor() {
+    super("No configured LLM API key");
+    this.name = "LLMNotConfiguredError";
+  }
+}
 
 function getClient(): OpenAI {
-  const provider = (process.env.LLM_PROVIDER ?? "qwen").toLowerCase();
-
-  if (provider === "deepseek") {
-    return new OpenAI({
-      apiKey:
-        process.env.DEEPSEEK_API_KEY ||
-        "unset-configure-DEEPSEEK_API_KEY-in-.env",
-      baseURL: process.env.DEEPSEEK_BASE_URL || DEEPSEEK_BASE_URL,
-    });
-  }
-
-  // Default: Qwen via DashScope
-  return new OpenAI({
-    apiKey:
-      process.env.DASHSCOPE_API_KEY ||
-      "unset-configure-DASHSCOPE_API_KEY-in-.env",
-    baseURL: process.env.DASHSCOPE_BASE_URL || DASHSCOPE_BASE_URL,
-  });
+  const config = getRuntimeConfig();
+  if (!config.apiKey) throw new LLMNotConfiguredError();
+  return new OpenAI({ apiKey: config.apiKey, baseURL: config.baseUrl });
 }
 
 function getModel(): string {
-  const provider = (process.env.LLM_PROVIDER ?? "qwen").toLowerCase();
-  if (provider === "deepseek") {
-    return process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
-  }
-  return process.env.DASHSCOPE_MODEL ?? "qwen-plus";
+  return getRuntimeConfig().model;
 }
 
 /** Format retrieved policy chunks as the [bank — section] text block fed to the model. */

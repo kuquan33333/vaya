@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { T, type Lang } from "./dict";
 
-const STORAGE_KEY = "vaya_lang";
+const STORAGE_KEY = "vaytiendanang_lang";
 
 // Apply the persisted language before the browser paints, so a non-default
 // language never flashes English first on refresh. Falls back to useEffect on
@@ -46,7 +46,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   // Hydrate persisted language before first paint (avoids default-language flash).
   useIsoLayoutEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("vaya_lang");
       if (saved === "en" || saved === "vi" || saved === "zh") {
         setLangState(saved);
         document.documentElement.lang = saved;

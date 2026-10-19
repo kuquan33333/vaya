@@ -23,8 +23,10 @@ import {
   validateProfile,
   type RejectionCode,
 } from "@/lib/validation/profileSchema";
-import { runCalculation } from "@/lib/engine/pipeline";
-import { getAllChunks } from "@/lib/ai/rag/store";
+import { getCloudflareEnv } from "@/lib/cloudflare/env";
+import { loadCatalog, publicProducts } from "@/lib/catalog/service";
+import { emptyCatalogScoreLog, rankCatalogProducts } from "@/lib/catalog/ranking";
+import { getPolicyChunks, type PolicyChunk } from "@/lib/ai/rag/store";
 import { retrieveTopK } from "@/lib/ai/rag/retrieve";
 import { embedText } from "@/lib/ai/rag/embed";
 import {
@@ -35,6 +37,7 @@ import {
 } from "@/lib/i18n/apiMessages";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { detectInjection, sanitizeMessage } from "@/lib/security/inputGuard";
+import { getRuntimeConfig } from "@/lib/cloudflare/runtime";
 
 /* ================================================================
    Session state — in-memory (demo-grade; swap for Redis before prod)
@@ -162,8 +165,8 @@ function isValidOfferContext(o: unknown): o is OfferDiscussionContext {
 function retrieveOfferPolicyChunks(
   queryEmbedding: number[],
   bank: string,
+  all: PolicyChunk[],
 ): PolicyChunkContext[] {
-  const all = getAllChunks();
   const bankNorm = bank.trim().toLowerCase();
   const bankChunks = all.filter(
     (c) =>
@@ -304,12 +307,12 @@ function computeOfferPricing(offer: OfferDiscussionContext): OfferPricing {
    ================================================================ */
 
 /** Retrieve the top-K policy chunks for a question and derive their citations. */
-async function retrievePolicyContext(question: string): Promise<{
+async function retrievePolicyContext(question: string, all: PolicyChunk[]): Promise<{
   chunks: PolicyChunkContext[];
   citations: { bank: string; section: string }[];
 }> {
   const queryEmbedding = await embedText(question);
-  const top = retrieveTopK(queryEmbedding, getAllChunks(), 5);
+  const top = retrieveTopK(queryEmbedding, all, 5);
   const chunks = top.map((t) => ({
     text: t.chunk.text,
     bank: t.chunk.bank,
@@ -335,8 +338,8 @@ interface PolicyContextResult {
  * when (and if) their path needs grounding. Best effort: any embedding or
  * retrieval failure resolves to empty context so the conversation continues.
  */
-function prefetchPolicyContext(question: string): Promise<PolicyContextResult> {
-  return retrievePolicyContext(question).catch(() => ({
+function prefetchPolicyContext(question: string, all: PolicyChunk[]): Promise<PolicyContextResult> {
+  return retrievePolicyContext(question, all).catch(() => ({
     chunks: [],
     citations: [],
   }));
@@ -498,6 +501,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const runtime = getCloudflareEnv();
+  if (runtime.CHAT_RATE_LIMIT) {
+    try {
+      const outcome = await runtime.CHAT_RATE_LIMIT.limit({ key: clientIp || sessionId });
+      if (!outcome.success) {
+        return new Response(JSON.stringify({ reply: apiT("rate_limited", lang), error: true }), {
+          status: 429,
+          headers: { "Content-Type": "application/json", "Retry-After": "60" },
+        });
+      }
+    } catch {
+      // The isolate-local limiter remains the local/dev fallback.
+    }
+  }
+
   const sanitized = sanitizeMessage(message);
   if (!sanitized) {
     return new Response(JSON.stringify({ error: "Message is empty" }), {
@@ -531,6 +549,7 @@ export async function POST(request: NextRequest) {
   }
 
   const llm = getLLMProvider();
+  const ragChunks = await getPolicyChunks(runtime.DB);
   // The in-memory session is a cache; the client is the durable source of truth
   // (it survives server restarts/redeploys — no database). Rehydrate from the
   // client's re-sent state only on a cache miss; within a live session the
@@ -585,7 +604,7 @@ export async function POST(request: NextRequest) {
     let policyChunks: PolicyChunkContext[] = [];
     try {
       const queryEmbedding = await embedText(sanitized);
-      policyChunks = retrieveOfferPolicyChunks(queryEmbedding, offer.bank);
+      policyChunks = retrieveOfferPolicyChunks(queryEmbedding, offer.bank, ragChunks);
     } catch {
       policyChunks = [];
     }
@@ -631,7 +650,7 @@ export async function POST(request: NextRequest) {
   // Policy retrieval depends only on the message: start it now so it overlaps
   // the extraction LLM call instead of adding serial latency later. Every
   // consumer (policy answer, advisor grounding, MIXED) awaits this one promise.
-  const policyPrefetch = prefetchPolicyContext(sanitized);
+  const policyPrefetch = prefetchPolicyContext(sanitized, ragChunks);
   let intentResult;
   try {
     intentResult = await extractAndClassify(
@@ -648,9 +667,9 @@ export async function POST(request: NextRequest) {
       "[chat] extractAndClassify failed:",
       err instanceof Error ? err.message : err,
       "| provider=",
-      process.env.LLM_PROVIDER,
-      "| deepseekKeyPresent=",
-      Boolean(process.env.DEEPSEEK_API_KEY),
+      getRuntimeConfig().provider,
+      "| keyPresent=",
+      Boolean(getRuntimeConfig().apiKey),
     );
     return new Response(
       JSON.stringify({
@@ -824,13 +843,21 @@ export async function POST(request: NextRequest) {
   });
   sessions.set(sessionId, session);
 
-  const scoreLog = runCalculation({
+  const loanProfile = {
     ...profile,
     thoi_han_thang: profile.thoi_han_thang!,
     // Income may be null when strong collateral qualifies the loan on asset
     // coverage; the pipeline handles the absent-income case deterministically.
     thu_nhap_hang_thang: profile.thu_nhap_hang_thang ?? null,
-  });
+  };
+  const snapshot = await loadCatalog(getCloudflareEnv().DB);
+  const products = publicProducts(snapshot.products);
+  const scoreLog = products.length > 0
+    ? rankCatalogProducts(loanProfile, products)
+    : emptyCatalogScoreLog(
+        loanProfile,
+        "Chưa có sản phẩm đã xác minh trong catalog D1; tôi chưa thể đưa ra thứ hạng hay lãi suất.",
+      );
 
   return sseResponse(async (write) => {
     // 1. Authoritative results event (numbers from engine, never from LLM)
@@ -842,6 +869,9 @@ export async function POST(request: NextRequest) {
       ranked: scoreLog.ranked,
       rejected: scoreLog.rejected,
       recovery: scoreLog.recovery,
+      catalogReady: scoreLog.catalogReady,
+      dataStatus: scoreLog.dataStatus,
+      catalogMessage: scoreLog.catalogMessage,
       citations: policyResult?.citations,
     });
 

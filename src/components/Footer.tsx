@@ -30,7 +30,7 @@ export default function Footer() {
         <div className="foot-grid">
           <div>
             <a className="brand" onClick={goHome} style={{ cursor: "pointer" }}>
-              <LogoLight /> Vaya
+              <LogoLight /> vaytiendanang
             </a>
             <p>{t("foot_about")}</p>
           </div>
@@ -55,7 +55,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="foot-bot">
-          <span>© 2026 Vaya. Built for the AI Raiser</span>
+          <span>© 2026 vaytiendanang</span>
           <button className="foot-top" onClick={goHome}>
             {t("foot_top")} <span aria-hidden="true">↑</span>
           </button>
@@ -70,7 +70,7 @@ export default function Footer() {
         <span className="foot-mark-logo">
           <LogoLight />
         </span>
-        <span className="foot-mark-word">VAYA</span>
+        <span className="foot-mark-word">VAYTIENDANANG</span>
       </div>
     </footer>
   );

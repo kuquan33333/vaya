@@ -5,7 +5,7 @@
  * behind it.
  *
  * It sits between the value marquee and the testimonials: the marquee finishes
- * the "what Vaya is" argument, this answers "why keep using it", and the social
+ * the "what vaytiendanang is" argument, this answers "why keep using it", and the social
  * proof then lands on someone already convinced. Full width on purpose — as a
  * card floating inside a section it read as an orphan panel, and against the
  * dark Manifesto above it there was no edge to see.

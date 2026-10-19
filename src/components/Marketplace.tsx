@@ -10,13 +10,12 @@
  *
  * No AI in this flow on purpose: it is a forum, and forums work.
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { bankOf, logoSrc, purpName, type Purpose } from "@/data/banks";
 import { fmtVND, termLabel } from "@/lib/loanEngine";
-import { INCOME_BANDS, SEED_POSTS, type MarketOffer, type MarketPost } from "@/data/marketplace";
-import { addBid, addPost, removePost, useMyPosts } from "@/lib/marketStore";
+import { INCOME_BANDS, type MarketOffer, type MarketPost } from "@/data/marketplace";
 import Term from "@/components/Term";
 
 const PURPOSES: Purpose[] = ["home", "car", "business", "personal", "secured"];
@@ -38,13 +37,10 @@ function bestOf(p: MarketPost): { offer: MarketOffer; cut: number } | null {
 export default function Marketplace() {
   const { lang, t } = useI18n();
   const router = useRouter();
-  const mine = useMyPosts();
-
   const [filter, setFilter] = useState<"all" | Purpose>("all");
   const [sort, setSort] = useState<SortKey>("new");
   const [open, setOpen] = useState<string | null>("p1");
   const [composing, setComposing] = useState(false);
-  const [justPosted, setJustPosted] = useState<string | null>(null);
 
   // form
   const [purpose, setPurpose] = useState<Purpose>("home");
@@ -54,12 +50,10 @@ export default function Marketplace() {
   const [collateral, setCollateral] = useState("yes");
   const [note, setNote] = useState("");
 
-  // Banks answer a fresh request on a timer, so the board demonstrates the race
-  // rather than sitting empty after posting.
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  const posts = useMemo(() => [...mine, ...SEED_POSTS], [mine]);
+  // A public board is intentionally empty until requests and provider offers
+  // are backed by D1. Local seed posts and simulated replies must not look like
+  // real bank quotes.
+  const posts = useMemo(() => [] as MarketPost[], []);
 
   const shown = useMemo(() => {
     const list = posts.filter((p) => filter === "all" || p.purpose === filter);
@@ -78,7 +72,7 @@ export default function Marketplace() {
     return {
       requests: posts.length,
       offers: offers.length,
-      avgCut: cuts.length ? (cuts.reduce((a, b) => a + b, 0) / cuts.length).toFixed(2) : "0",
+      avgCut: cuts.length ? (cuts.reduce((a, b) => a + b, 0) / cuts.length).toFixed(2) : "—",
     };
   }, [posts]);
 
@@ -90,23 +84,14 @@ export default function Marketplace() {
     const amt = Number(DIGITS(amount)) || 0;
     const mo = Number(DIGITS(term)) || 0;
     if (amt <= 0 || mo <= 0) return;
-    const id = addPost({
-      purpose,
-      amount: amt,
-      termMonths: mo,
-      incomeBand: band,
-      collateral: collateral === "yes",
-      note,
+    const params = new URLSearchParams({
+      source: "market",
+      loanType: purpose,
+      amountVnd: String(amt),
+      termMonths: String(mo),
+      note: note.slice(0, 800),
     });
-    setComposing(false);
-    setNote("");
-    setJustPosted(id);
-    setOpen(id);
-    timers.current.push(
-      setTimeout(() => addBid(id, 0), 2600),
-      setTimeout(() => addBid(id, 1), 6200),
-      setTimeout(() => addBid(id, 2), 11000),
-    );
+    router.push(`/register?${params.toString()}`);
   };
 
   return (
@@ -117,6 +102,7 @@ export default function Marketplace() {
             <span className="sec-tag">{t("mk_tag")}</span>
             <h2>{t("mk_title")}</h2>
             <p>{t("mk_sub")}</p>
+            <div className="mk-source-notice" role="status">{t("mk_live_state")}</div>
           </div>
           <div className="mk-stats">
             <div className="glab">{t("mk_board")}</div>
@@ -129,7 +115,7 @@ export default function Marketplace() {
               <span>{t("mk_st_off")}</span>
             </div>
             <div className="mk-stat">
-              <b className="g">−{stats.avgCut}%</b>
+              <b className="g">{stats.avgCut === "—" ? "—" : `−${stats.avgCut}%`}</b>
               <Term id="mkcut" label={t("mk_st_cut")} />
             </div>
           </div>
@@ -267,11 +253,6 @@ export default function Marketplace() {
                   </span>
                   {p.mine && <span className="mk-mine">{t("mk_yours")}</span>}
                   <span className="mk-time">{ago(p.hoursAgo)}</span>
-                  {p.mine && (
-                    <button className="cmp-rm mk-wd" onClick={() => removePost(p.id)}>
-                      {t("mk_withdraw")}
-                    </button>
-                  )}
                 </div>
 
                 <div className="mk-spec">
@@ -319,13 +300,7 @@ export default function Marketplace() {
                     </span>
                   ) : (
                     <span className="mk-waiting">
-                      {p.mine && justPosted === p.id ? (
-                        <>
-                          <span className="mk-pulse" /> {t("mk_waiting")}
-                        </>
-                      ) : (
-                        t("mk_no_offers")
-                      )}
+                      {t("mk_no_offers")}
                     </span>
                   )}
                   <button

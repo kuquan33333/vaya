@@ -61,7 +61,7 @@ export default function Navbar() {
     <header>
       <div className="wrap nav">
         <a className="brand" onClick={goHome} style={{ cursor: "pointer" }}>
-          <Logo /> Vaya
+          <Logo /> vaytiendanang
         </a>
         <div className="links">
           <a className={isHome ? "on" : ""} onClick={goHome}>

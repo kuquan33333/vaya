@@ -5,9 +5,9 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { Lang } from "@/i18n/dict";
 
 function hotSet(lang: Lang): Set<string> {
-  if (lang === "en") return new Set(["conversation", "confidence", "Vaya", "clear", "right"]);
-  if (lang === "vi") return new Set(["chuyện", "tự", "tin", "rõ", "đúng", "Vaya"]);
-  return new Set(["对话", "自信", "清晰", "Vaya", "对"]);
+  if (lang === "en") return new Set(["conversation", "confidence", "clear", "right"]);
+  if (lang === "vi") return new Set(["chuyện", "tự", "tin", "rõ", "đúng"]);
+  return new Set(["对话", "自信", "清晰", "对"]);
 }
 
 export default function Manifesto() {

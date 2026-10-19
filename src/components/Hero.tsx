@@ -117,7 +117,7 @@ export default function Hero() {
       {/* Animated mascot — a true-transparent looping WebP that sits a fixed
           distance left of the centered content and gestures toward the chat. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="hero-mascot" src="/mascot/vaya-mascot.gif" alt="Vaya mascot" aria-hidden="true" />
+      <img className="hero-mascot" src="/mascot/vaya-mascot.gif" alt="vaytiendanang" aria-hidden="true" />
       <div className="wrap hero-inner">
         <span className="eyebrow">
           <span className="dot" /> <span>{t("hero_eyebrow")}</span>
@@ -167,13 +167,7 @@ export default function Hero() {
         </div>
 
         <div className="social">
-          <div className="avs">
-            <span>M</span>
-            <span>A</span>
-            <span>L</span>
-            <span>+</span>
-          </div>
-          <span className="stars">★★★★★</span>
+          <span className="social-mark" aria-hidden="true">✓</span>
           <span>{t("social")}</span>
         </div>
       </div>

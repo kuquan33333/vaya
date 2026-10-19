@@ -3,18 +3,7 @@
 import React from "react";
 import { useI18n } from "@/i18n/I18nProvider";
 
-const ITEMS: [string, string, string][] = [
-  ["t1", "t1n", "t1r"],
-  ["t2", "t2n", "t2r"],
-  ["t3", "t3n", "t3r"],
-];
-
-// Memoji-style avatars (on a green circle) per testimonial.
-const AVA: Record<string, string> = {
-  t1: "/testimonials/minh.png",
-  t2: "/testimonials/an.png",
-  t3: "/testimonials/linh.png",
-};
+const ITEMS = ["1", "2", "3"] as const;
 
 export default function Testimonials() {
   const { t } = useI18n();
@@ -26,23 +15,16 @@ export default function Testimonials() {
           <h2>{t("love_title")}</h2>
         </div>
         <div className="tst-grid" id="tstGrid">
-          {ITEMS.map(([q, n, r]) => {
-            const name = t(n);
-            return (
-              <div className="tst reveal" key={q}>
-                <div className="stars">★★★★★</div>
-                <p>{t(q)}</p>
-                <div className="who">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="a" src={AVA[q]} alt={name} />
-                  <div>
-                    <b>{name}</b>
-                    <small>{t(r)}</small>
-                  </div>
-                </div>
+          {ITEMS.map((id) => (
+            <div className="tst reveal" key={id}>
+              <div className="stars" aria-hidden="true">✓</div>
+              <p>{t(`proof_desc_${id}`)}</p>
+              <div className="who">
+                <span className="a proof-icon" aria-hidden="true">{id}</span>
+                <div><b>{t(`proof_title_${id}`)}</b><small>vaytiendanang</small></div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
     </section>

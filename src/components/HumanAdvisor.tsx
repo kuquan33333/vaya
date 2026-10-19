@@ -3,20 +3,13 @@
 /**
  * "Talk to a human" hand-off.
  *
- * Demo behaviour: the desk is deliberately shown as off duty. Rather than a dead
- * end, the offline state is the feature — it states when the desk reopens, keeps
- * the AI available in the meantime, and takes a callback request so the user
- * still leaves having done something.
+ * The hand-off writes a real lead through the same consented registration API
+ * as every other CTA. It never displays a success state before D1 accepts it.
  */
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-
-const AGENTS = [
-  { id: "lan", name: "Lan Nguyễn", roleKey: "hm_role_home", av: "👩🏻‍💼" },
-  { id: "minh", name: "Minh Trần", roleKey: "hm_role_biz", av: "👨🏻‍💼" },
-  { id: "thao", name: "Thảo Phạm", roleKey: "hm_role_car", av: "👩🏻" },
-];
+import TurnstileWidget from "./TurnstileWidget";
 
 const TOPICS = ["hm_topic_pkg", "hm_topic_docs", "hm_topic_reject", "hm_topic_other"];
 
@@ -28,17 +21,42 @@ export default function HumanAdvisor() {
   const [phone, setPhone] = useState("");
   const [topic, setTopic] = useState(TOPICS[0]);
   const [note, setNote] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [error, setError] = useState("");
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const valid = name.trim().length > 1 && phone.replace(/\D/g, "").length >= 9;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid || state === "sending") return;
     setState("sending");
-    // Demo only — no request is made. The delay exists so the pending state is
-    // visible to whoever is watching the walkthrough.
-    setTimeout(() => setState("sent"), 1100);
+    setError("");
+    try {
+      const idempotencyKey = idempotencyKeyRef.current ?? (idempotencyKeyRef.current = crypto.randomUUID());
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({
+          fullName: name,
+          phone,
+          province: "Đà Nẵng",
+          loanType: topic,
+          note: note || null,
+          source: "human",
+          consentContact: true,
+          consentProcessingNotice: true,
+          consentDocumentUpload: false,
+          turnstileToken,
+        }),
+      });
+      if (!response.ok) throw new Error("Không thể lưu yêu cầu. Vui lòng thử lại hoặc mở form đăng ký.");
+      setState("sent");
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : "Không thể lưu yêu cầu.");
+      setState("error");
+    }
   };
 
   return (
@@ -56,26 +74,15 @@ export default function HumanAdvisor() {
           </div>
           <div className="hm-hours">
             <div className="glab">{t("hm_hours_lab")}</div>
-            <div className="hm-hrow">
-              <span>{t("hm_hours_wd")}</span>
-              <b>08:30 – 18:00</b>
-            </div>
-            <div className="hm-hrow">
-              <span>{t("hm_hours_sat")}</span>
-              <b>09:00 – 12:00</b>
-            </div>
-            <div className="hm-hrow">
-              <span>{t("hm_hours_sun")}</span>
-              <b className="hm-off">{t("hm_closed")}</b>
-            </div>
+            <p>{t("hm_hours_pending")}</p>
           </div>
         </div>
 
         <div className="hm-banner">
           <span className="hm-dot" />
           <div>
-            <b>{t("hm_offline_t")}</b>
-            <p>{t("hm_offline_d")}</p>
+            <b>{t("hm_intake_t")}</b>
+            <p>{t("hm_intake_d")}</p>
           </div>
           <button className="btn btn-green btn-sm" onClick={() => router.push("/chat")}>
             {t("hm_use_ai")}
@@ -86,18 +93,14 @@ export default function HumanAdvisor() {
           <div>
             <div className="rc-clab">{t("hm_team")}</div>
             <div className="hm-team">
-              {AGENTS.map((a) => (
-                <div className="hm-agent" key={a.id}>
-                  <span className="hm-av">{a.av}</span>
-                  <div className="hm-who">
-                    <b>{a.name}</b>
-                    <small>{t(a.roleKey)}</small>
-                  </div>
-                  <span className="hm-status">
-                    <i /> {t("hm_away")}
-                  </span>
+              <div className="hm-agent">
+                <span className="hm-av">👥</span>
+                <div className="hm-who">
+                  <b>{t("hm_staff_desk")}</b>
+                  <small>{t("hm_staff_scope")}</small>
                 </div>
-              ))}
+                <span className="hm-status"><i /> {t("hm_staff_status")}</span>
+              </div>
             </div>
             <p className="chk-hint">{t("hm_note")}</p>
           </div>
@@ -148,9 +151,11 @@ export default function HumanAdvisor() {
                   <span>{t("hm_f_note")}</span>
                   <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("hm_f_note_ph")} />
                 </label>
+                <TurnstileWidget onToken={setTurnstileToken} />
                 <button className="btn btn-green" disabled={!valid || state === "sending"}>
                   {state === "sending" ? t("hm_sending") : t("hm_send")}
                 </button>
+                {error && <p className="form-error">{error}</p>}
               </form>
             )}
           </div>

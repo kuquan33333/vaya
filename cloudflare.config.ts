@@ -1,0 +1,47 @@
+import { bindings, defineConfig, defineWorker } from "cf/config";
+
+export default defineConfig({
+  worker: defineWorker({
+    name: "vaytiendanang",
+    entrypoint: "vinext/server/fetch-handler",
+    compatibilityDate: "2026-10-19",
+    compatibilityFlags: ["nodejs_compat"],
+    assets: {
+      htmlHandling: "none",
+      notFoundHandling: "none",
+      runWorkerFirst: ["/*", "!/_next/static/*", "!/*/_next/static/*"],
+    },
+    observability: {
+      enabled: true,
+      headSamplingRate: 1,
+      redactQueryString: true,
+      logs: { enabled: true, invocationLogs: true, persist: true },
+    },
+    env: {
+      ASSETS: bindings.assets(),
+      DB: bindings.d1({ name: "vaytiendanang-db" }),
+      LEAD_DOCUMENTS: bindings.r2({ name: "vaytiendanang-lead-documents" }),
+      LEAD_QUEUE: bindings.queue({ name: "vaytiendanang-lead-notifications" }),
+      LEAD_RATE_LIMIT: bindings.rateLimit({ namespace: "vaytiendanang-leads", simple: { limit: 5, period: 60 } }),
+      CHAT_RATE_LIMIT: bindings.rateLimit({ namespace: "vaytiendanang-chat", simple: { limit: 20, period: 60 } }),
+      LLM_PROVIDER: bindings.text("qwen"),
+      DOCUMENT_UPLOADS_ENABLED: bindings.text("false"),
+      DASHSCOPE_API_KEY: bindings.secret(),
+      DASHSCOPE_BASE_URL: bindings.secret(),
+      DASHSCOPE_MODEL: bindings.secret(),
+      DASHSCOPE_EMBEDDING_MODEL: bindings.secret(),
+      DEEPSEEK_API_KEY: bindings.secret(),
+      DEEPSEEK_BASE_URL: bindings.secret(),
+      DEEPSEEK_MODEL: bindings.secret(),
+      TELEGRAM_BOT_TOKEN: bindings.secret(),
+      TELEGRAM_CHAT_ID: bindings.secret(),
+      TURNSTILE_SECRET_KEY: bindings.secret(),
+      TURNSTILE_SITE_KEY: bindings.secret(),
+      ZALO_CONTACT_URL: bindings.secret(),
+      PUBLIC_SITE_URL: bindings.secret(),
+      STAFF_ACCESS_TEAM_DOMAIN: bindings.secret(),
+      STAFF_ACCESS_AUD: bindings.secret(),
+      DOCUMENT_UPLOAD_SIGNING_KEY: bindings.secret(),
+    },
+  }),
+});

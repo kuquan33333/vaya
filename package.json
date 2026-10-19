@@ -2,28 +2,53 @@
   "name": "vaya",
   "version": "1.0.0",
   "private": true,
-  "description": "Vaya — Your AI loan advisor. Chat-first, compares official loan products across 20+ Vietnamese banks. Private, unbiased, free.",
+  "description": "vaytiendanang — AI loan advisor with verified-source catalog and deterministic financial analysis.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "dev:vinext": "vite dev --port 3001",
+    "build:vinext": "vite build",
+    "start:vinext": "vite preview",
+    "deploy:vinext": "vinext-cloudflare deploy",
+    "deploy:ingestor": "cd workers/ingestor && cf deploy --config cloudflare.config.ts",
+    "catalog:review": "node scripts/catalog-review.mjs",
+    "catalog:import": "node scripts/catalog-import.mjs import"
   },
   "dependencies": {
+    "@vinext/cloudflare": "latest",
     "gsap": "^3.15.0",
-    "next": "14.2.5",
+    "next": "^16.4.2",
     "openai": "^7.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-server-dom-webpack": "latest",
+    "vinext": "latest",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.14.12",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@cloudflare/vite-plugin": "beta",
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-rsc": "latest",
+    "@vitest/coverage-v8": "^5.0.5",
     "autoprefixer": "^10.4.19",
+    "cf": "latest",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.2",
     "postcss": "^8.4.40",
     "tailwindcss": "^3.4.7",
-    "typescript": "^5.5.4"
-  }
+    "typescript": "^5.5.4",
+    "vite": "8.3.0",
+    "vitest": "^5.0.5"
+  },
+  "type": "module"
 }

@@ -3,12 +3,12 @@
 import React from "react";
 
 /**
- * Vaya brand mark — the green pixel-arrow logo (served from /public/logo.png).
+ * vaytiendanang brand mark — the green pixel-arrow logo.
  */
 export function Logo() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img className="brandmark" src="/logo.png" alt="Vaya" />
+    <img className="brandmark" src="/logo.png" alt="vaytiendanang" />
   );
 }
 
@@ -20,12 +20,12 @@ export function Logo() {
 export function LogoLight() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img className="brandmark" src="/logo-white.png" alt="Vaya" />
+    <img className="brandmark" src="/logo-white.png" alt="vaytiendanang" />
   );
 }
 
 /**
- * White version of the Vaya pixel-arrow — used on dark surfaces (chat avatar).
+ * White version of the vaytiendanang pixel-arrow — used on dark surfaces (chat avatar).
  * Extracted verbatim from the source app.
  */
 export function LogoWhite() {
