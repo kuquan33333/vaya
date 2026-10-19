@@ -22,7 +22,7 @@ const STATIC_MIME_TYPES = {
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
 };
-const ASSET_VERSION = "5212c33";
+const ASSET_VERSION = "safari-hydration-20261019";
 
 class StaticAssetAttributeRewriter {
   constructor(attribute) {
