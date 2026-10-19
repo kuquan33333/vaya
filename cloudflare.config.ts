@@ -20,7 +20,6 @@ export default defineConfig({
     env: {
       ASSETS: bindings.assets(),
       DB: bindings.d1({ name: "vaytiendanang-db" }),
-      LEAD_DOCUMENTS: bindings.r2({ name: "vaytiendanang-lead-documents" }),
       LEAD_QUEUE: bindings.queue({ name: "vaytiendanang-lead-notifications" }),
       LEAD_RATE_LIMIT: bindings.rateLimit({ namespace: "vaytiendanang-leads", simple: { limit: 5, period: 60 } }),
       CHAT_RATE_LIMIT: bindings.rateLimit({ namespace: "vaytiendanang-chat", simple: { limit: 20, period: 60 } }),
