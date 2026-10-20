@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { Logo } from "@/components/Logo";
 import type { Lang } from "@/i18n/dict";
@@ -13,7 +13,6 @@ const LANGS: Record<Lang, { flag: string; name: string }> = {
 };
 
 export default function Navbar() {
-  const router = useRouter();
   const pathname = usePathname();
   const { lang, setLang, t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -36,11 +35,6 @@ export default function Navbar() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const goHome = () => {
-    if (pathname === "/") window.scrollTo({ top: 0, behavior: "smooth" });
-    else router.push("/");
-  };
-
   // The nav lists real destinations only. Sub-pages are children of a
   // destination, so they light up their parent instead of adding an entry:
   //   /  + /package/*  + /compare                -> Home
@@ -60,17 +54,17 @@ export default function Navbar() {
   return (
     <header>
       <div className="wrap nav">
-        <a className="brand" onClick={goHome} style={{ cursor: "pointer" }}>
+        <a className="brand" href="/" style={{ cursor: "pointer" }}>
           <Logo /> vaytiendanang
         </a>
         <div className="links">
-          <a className={isHome ? "on" : ""} onClick={goHome}>
+          <a className={isHome ? "on" : ""} href="/">
             {t("nav_home")}
           </a>
-          <a className={isMarket ? "on" : ""} onClick={() => router.push("/market")}>
+          <a className={isMarket ? "on" : ""} href="/market">
             {t("nav_market")}
           </a>
-          <a className={isSurvival ? "on" : ""} onClick={() => router.push("/survival")}>
+          <a className={isSurvival ? "on" : ""} href="/survival">
             {t("nav_surv")}
           </a>
         </div>
@@ -108,12 +102,7 @@ export default function Navbar() {
               ))}
             </div>
           </div>
-          <button
-            className={"btn btn-green btn-sm navcta" + (inAdvisor ? " on" : "")}
-            onClick={() => router.push("/chat")}
-          >
-            {t("cta_chat")}
-          </button>
+          <a href="/chat" className={"btn btn-green btn-sm navcta" + (inAdvisor ? " on" : "")}>{t("cta_chat")}</a>
           <button
             className={"navtoggle" + (menu ? " on" : "")}
             aria-label="Menu"
@@ -126,13 +115,13 @@ export default function Navbar() {
       </div>
       {/* Mobile navigation panel (hamburger) */}
       <nav className="navpanel" hidden={!menu}>
-        <a className={isHome ? "on" : ""} onClick={() => { setMenu(false); goHome(); }}>
+        <a className={isHome ? "on" : ""} href="/" onClick={() => setMenu(false)}>
           {t("nav_home")}
         </a>
-        <a className={isMarket ? "on" : ""} onClick={() => { setMenu(false); router.push("/market"); }}>
+        <a className={isMarket ? "on" : ""} href="/market" onClick={() => setMenu(false)}>
           {t("nav_market")}
         </a>
-        <a className={isSurvival ? "on" : ""} onClick={() => { setMenu(false); router.push("/survival"); }}>
+        <a className={isSurvival ? "on" : ""} href="/survival" onClick={() => setMenu(false)}>
           {t("nav_surv")}
         </a>
       </nav>
