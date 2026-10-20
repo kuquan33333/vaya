@@ -1,11 +1,15 @@
 # Trạng thái triển khai vaytiendanang
 
-Ngày cập nhật: 2026-10-19 (UTC)
+Ngày cập nhật: 2026-10-20 (UTC)
 
-Trạng thái tổng: **DEPLOYED — runtime secrets pending**. Code đã được commit
-trên branch này và deploy thật vào account Cloudflare; URL production đã trả
-HTML/catalog thành công. `/api/health` vẫn degraded có kiểm soát vì runtime
-secrets tích hợp chưa được cấp, nên chưa gọi hệ thống là production-ready.
+Trạng thái tổng: **CODE-VALIDATED — production deployment blocked**. Commit
+`6f8932c` đã qua CI, build và smoke test local. Hạ tầng Cloudflare hiện hữu vẫn
+đang hoạt động, nhưng production chưa nhận commit này: deployment Pages hiện
+tại `a8692eec-5bc7-4f89-8799-12fa5655eb0a` vẫn gắn với SHA `5c1f230`. Workflow
+dispatch production `39368143475` đã dừng trước mọi lệnh Cloudflare vì sáu
+GitHub Actions secrets deploy đang rỗng. `/api/health` production vẫn trả
+503 degraded do runtime integrations chưa đủ; không gọi hệ thống là
+production-ready.
 
 ## DONE — có bằng chứng trong repository
 
@@ -41,6 +45,11 @@ secrets tích hợp chưa được cấp, nên chưa gọi hệ thống là prod
   chỉ lấy D1 verified; CTA nội bộ; marketplace không còn offer/seed giả;
   biểu đồ legacy không còn seeded trend/AVG giả, rate history chỉ vẽ snapshot
   thật khi đủ dữ liệu.
+- UI red-white mới đã được kiểm tra local trên Chromium với kích thước iPhone
+  375px và desktop 1280px: carousel bốn chủ đề, CTA nội bộ, estimator chỉ
+  tính từ product verified, form đăng ký giữ context, chat nổi có dialog/focus
+  và footer mobile không tràn ngang. Đây chưa phải bằng chứng Safari/WebKit
+  thật và chưa phải production smoke test.
 - Cloudflare live: D1 production, Queue/DLQ, app Worker, ingestor Worker với
   cron + Queue consumer và Pages project hiện hữu `vaytiendanang` đã được
   kiểm chứng. Production root/catalog trả 200; staging preview cũng trả
@@ -61,15 +70,20 @@ secrets tích hợp chưa được cấp, nên chưa gọi hệ thống là prod
   ảnh chuyên dụng và quy trình pháp lý cần tích hợp thêm theo hạ tầng thực tế.
 - Chat transcript bền ở localStorage phía client; server session là cache
   isolate và được rehydrate mỗi request, chưa dùng `chat_sessions` D1.
-- CI có lint/typecheck/unit/Next/Vinext build và live-health gate; chưa có
-  Playwright E2E đầy đủ trong môi trường này. Live health hiện trả 503 vì
+- CI có lint/typecheck/unit/Next/Vinext build và live-health gate; smoke test
+  local có Playwright Chromium iPhone-UA/desktop, nhưng WebKit executable
+  không có trong môi trường này. Live health production hiện trả 503 vì
   secrets còn thiếu, đúng với fail-closed gate.
 
 ## BLOCKED — người vận hành phải cung cấp
 
-- GitHub Actions vẫn cần `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
-  production D1 ID, staging D1 ID và các public URL secrets để pipeline tự
-  deploy lại từ GitHub; connector đã dùng để triển khai lần kiểm chứng này.
+- GitHub Actions cần điền đúng sáu secret: `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`,
+  `CLOUDFLARE_STAGING_D1_DATABASE_ID`, `PUBLIC_SITE_URL` và
+  `STAGING_PUBLIC_SITE_URL`, rồi chạy workflow dispatch `target=staging`
+  trước `target=production`. Token phải giới hạn account đích và có quyền
+  Workers Scripts Edit, Pages Edit, D1 Edit, Queues Edit (cộng Account
+  Settings Read nếu Wrangler yêu cầu); không cần và không được cấp R2.
 - LLM key/model, Turnstile site/secret, Telegram bot token + allowlisted chat
   ID, `PUBLIC_SITE_URL`, Zalo HTTPS URL, Cloudflare Access team domain/audience
   và danh sách nhân viên allowlist.

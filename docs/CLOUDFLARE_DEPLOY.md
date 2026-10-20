@@ -19,12 +19,18 @@
 
 GitHub Actions production/staging cần:
 
-- `CLOUDFLARE_API_TOKEN`: Workers Scripts, Pages Deployments/Functions, D1
-  query/migration, Queue và Pages project configuration trong account đích;
+- `CLOUDFLARE_API_TOKEN`: token giới hạn trong account đích, có Workers Scripts
+  Edit, Pages Edit, D1 Edit, Queues Edit và Account Settings Read nếu Wrangler
+  yêu cầu; không cấp R2;
 - `CLOUDFLARE_ACCOUNT_ID`;
-- `CLOUDFLARE_D1_DATABASE_ID` của D1 `vaytiendanang-db`;
-- `PUBLIC_SITE_URL` trỏ tới `https://vaytiendanang.pages.dev` hoặc URL production
-  đang được dùng để health gate.
+- `CLOUDFLARE_D1_DATABASE_ID` của D1 production `vaytiendanang-db`;
+- `CLOUDFLARE_STAGING_D1_DATABASE_ID` của D1 staging;
+- `PUBLIC_SITE_URL=https://vaytiendanang.pages.dev`;
+- `STAGING_PUBLIC_SITE_URL` là URL gateway preview/staging dùng cho smoke test.
+
+Các tên trên phải được thêm tại GitHub repository **Settings → Secrets and
+variables → Actions**. Không ghi token vào source, workflow log hoặc file
+`.env` commit vào repository.
 
 Runtime app Worker cần:
 
