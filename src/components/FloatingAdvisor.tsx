@@ -52,7 +52,7 @@ export default function FloatingAdvisor() {
       {open && (
         <>
           <button className="floating-advisor-backdrop" type="button" aria-label={t("floating_close")} onClick={() => setOpen(false)} />
-          <div className="floating-advisor-panel" role="dialog" aria-modal="true" aria-labelledby="floating-advisor-title">
+          <div id="floating-advisor-panel" className="floating-advisor-panel" role="dialog" aria-modal="true" aria-labelledby="floating-advisor-title">
             <div className="floating-advisor-header">
               <div>
                 <strong id="floating-advisor-title">vaytiendanang</strong>
@@ -71,7 +71,7 @@ export default function FloatingAdvisor() {
           </div>
         </>
       )}
-      <a ref={launcherRef} href="/chat" className="floating-advisor" onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }} aria-expanded={open} aria-controls={open ? "floating-advisor-title" : undefined} aria-label={t("floating_open")}><span aria-hidden="true">✦</span><b>{t("cta_chat")}</b></a>
+      <a ref={launcherRef} href="/chat" className="floating-advisor" onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }} aria-expanded={open} aria-controls={open ? "floating-advisor-panel" : undefined} aria-label={t("floating_open")}><span aria-hidden="true">✦</span><b>{t("cta_chat")}</b></a>
       <a className="floating-lead" href="/register?source=ai" aria-label={t("floating_register")}>{t("floating_register_short")}</a>
     </>
   );
