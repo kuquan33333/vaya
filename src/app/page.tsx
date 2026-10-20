@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Hero from "@/components/Hero";
 import VerifiedPromoCarousel from "@/components/VerifiedPromoCarousel";
 import VerifiedMarketsSection from "@/components/VerifiedMarketsSection";
 import PurposePicker from "@/components/PurposePicker";
@@ -61,7 +60,7 @@ export default function Home() {
     <main id="homeView">
       {/* Opaque column that slides away to uncover the pinned footer. */}
       <div className="page-above">
-        <Hero />
+        {/* Banner/registration first; the full AI experience lives in FloatingAdvisor and /chat. */}
         <VerifiedPromoCarousel />
 
         <section className="trust">
