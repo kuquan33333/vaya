@@ -1,64 +1,61 @@
 "use client";
 
 import React from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import { LogoLight } from "@/components/Logo";
 
 export default function Footer() {
-  const router = useRouter();
   const pathname = usePathname();
   const { t } = useI18n();
 
-  const scrollToId = (id: string) => {
-    if (pathname === "/") {
-      const el = document.getElementById(id);
-      if (el) el.scrollIntoView({ behavior: "smooth" });
-    } else {
-      router.push("/#" + id);
-    }
-  };
-  const goHome = () => {
-    if (pathname === "/") window.scrollTo({ top: 0, behavior: "smooth" });
-    else router.push("/");
-  };
-  const openChat = () => router.push("/chat");
+  const sectionHref = (id: string) => pathname === "/" ? `#${id}` : `/#${id}`;
+  const homeHref = pathname === "/" ? "#homeView" : "/";
 
   return (
     <footer>
       <div className="wrap">
         <div className="foot-grid">
           <div>
-            <a className="brand" onClick={goHome} style={{ cursor: "pointer" }}>
+            <a className="brand" href="/">
               <LogoLight /> vaytiendanang
             </a>
             <p>{t("foot_about")}</p>
           </div>
           <div>
             <h5>{t("foot_product")}</h5>
-            <a onClick={openChat}>{t("cta_chat")}</a>
-            <a onClick={() => scrollToId("markets")}>{t("nav_markets")}</a>
-            <a onClick={() => scrollToId("how")}>{t("nav_how")}</a>
+            <a href="/chat">{t("cta_chat")}</a>
+            <a href={sectionHref("markets")}>{t("nav_markets")}</a>
+            <a href={sectionHref("how")}>{t("nav_how")}</a>
           </div>
           <div>
             <h5>{t("foot_loans")}</h5>
-            <a onClick={() => scrollToId("markets")}>{t("f_home")}</a>
-            <a onClick={() => scrollToId("markets")}>{t("f_car")}</a>
-            <a onClick={() => scrollToId("markets")}>{t("f_business")}</a>
-            <a onClick={() => scrollToId("markets")}>{t("f_personal")}</a>
+            <a href={sectionHref("markets")}>{t("f_home")}</a>
+            <a href={sectionHref("markets")}>{t("f_car")}</a>
+            <a href={sectionHref("markets")}>{t("f_business")}</a>
+            <a href={sectionHref("markets")}>{t("f_personal")}</a>
           </div>
           <div>
             <h5>{t("foot_company")}</h5>
-            <a>{t("foot_about_l")}</a>
-            <a>{t("foot_privacy")}</a>
-            <a>{t("foot_contact")}</a>
+            <a href={sectionHref("why")}>{t("foot_about_l")}</a>
+            <a href="/privacy">{t("foot_privacy")}</a>
+            <a href="/human">{t("foot_contact")}</a>
           </div>
         </div>
         <div className="foot-bot">
           <span>© 2026 vaytiendanang</span>
-          <button className="foot-top" onClick={goHome}>
+          <a
+            className="foot-top"
+            href={homeHref}
+            onClick={(event) => {
+              if (pathname === "/") {
+                event.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+          >
             {t("foot_top")} <span aria-hidden="true">↑</span>
-          </button>
+          </a>
         </div>
         <p className="disc">{t("disc")}</p>
       </div>

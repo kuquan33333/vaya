@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import {
   fetchPublicCatalog,
@@ -43,14 +42,14 @@ function ProductCard({
   product,
   selected,
   onCompare,
-  onOpen,
-  onRegister,
+  openHref,
+  registerHref,
 }: {
   product: CatalogProduct;
   selected: boolean;
   onCompare: () => void;
-  onOpen: () => void;
-  onRegister: () => void;
+  openHref: string;
+  registerHref: string;
 }) {
   const rate = primaryRate(product);
   return (
@@ -85,8 +84,8 @@ function ProductCard({
         <button className={"cmp-tog card" + (selected ? " on" : "")} onClick={onCompare} aria-pressed={selected}>
           {selected ? "✓" : "⇄"} So sánh
         </button>
-        <button className="pkg-cta" onClick={onOpen}>Xem điều khoản</button>
-        <button className="pkg-cta" onClick={onRegister}>Đăng ký tư vấn</button>
+        <a className="pkg-cta" href={openHref}>Xem điều khoản</a>
+        <a className="pkg-cta" href={registerHref}>Đăng ký tư vấn</a>
       </div>
     </article>
   );
@@ -99,7 +98,6 @@ export default function VerifiedMarketsSection({
   selectedFilter?: CatalogFilter;
   onFilterChange?: (filter: CatalogFilter) => void;
 }) {
-  const router = useRouter();
   const { t } = useI18n();
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -161,7 +159,7 @@ export default function VerifiedMarketsSection({
         <div className="verified-catalog-note">
           <b>{loading ? "Đang tải dữ liệu…" : `${products.length} sản phẩm đã xác minh`}</b>
           <span>{message ?? "Lãi suất hiển thị theo đúng cơ sở ghi trong nguồn; không phải cam kết duyệt vay."}</span>
-          <button className="btn btn-green btn-sm" onClick={() => router.push("/register?source=banner")}>Đăng ký để được kiểm tra hồ sơ</button>
+          <a className="btn btn-green btn-sm" href="/register?source=banner">Đăng ký để được kiểm tra hồ sơ</a>
         </div>
 
         <div className="table-card reveal">
@@ -195,7 +193,7 @@ export default function VerifiedMarketsSection({
               <div className="empty-d">
                 Không dùng dữ liệu minh họa thay cho lãi suất thật. Bạn vẫn có thể gửi yêu cầu để nhân viên kiểm tra nguồn và hồ sơ.
               </div>
-              <button className="btn btn-green btn-sm" onClick={() => router.push("/register?source=market")}>Gửi yêu cầu tư vấn</button>
+              <a className="btn btn-green btn-sm" href="/register?source=market">Gửi yêu cầu tư vấn</a>
             </div>
           ) : (
             <div className="pkg-grid">
@@ -205,8 +203,8 @@ export default function VerifiedMarketsSection({
                   product={product}
                   selected={selected.includes(product.stableSlug)}
                   onCompare={() => toggleCatalogCompare(product.stableSlug)}
-                  onOpen={() => router.push(`/product/${product.stableSlug}`)}
-                  onRegister={() => router.push(`/register?source=card&productId=${encodeURIComponent(product.productId)}&providerId=${encodeURIComponent(product.providerId)}`)}
+                  openHref={`/product/${product.stableSlug}`}
+                  registerHref={`/register?source=card&productId=${encodeURIComponent(product.productId)}&providerId=${encodeURIComponent(product.providerId)}`}
                 />
               ))}
             </div>
