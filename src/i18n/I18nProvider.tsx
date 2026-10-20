@@ -36,7 +36,7 @@ function resolve(lang: Lang, key: string): string | string[] | undefined {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+  const [lang, setLangState] = useState<Lang>("vi");
   // Keep the server-rendered application visible while the persisted language
   // is restored. Gating the entire tree behind a client-only splash means a
   // browser that cannot hydrate one module is left with an apparently blank
