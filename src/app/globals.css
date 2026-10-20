@@ -5707,3 +5707,57 @@ footer .brand svg {
     width: calc(33.333% - 8px);
   }
 }
+
+
+/* vaytiendanang mobile-first landing: service banner before categories, no oversized chat hero. */
+.home-lead-banner {
+  min-height: 270px;
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: clamp(24px, 5vw, 48px);
+  background: linear-gradient(115deg, #e5f7ee 0%, #f4fbf8 55%, #fff 100%);
+}
+.home-lead-banner h1 {
+  max-width: 800px;
+  margin: 0;
+  font-size: clamp(26px, 4vw, 44px);
+  line-height: 1.15;
+}
+.home-lead-banner p {
+  max-width: 720px;
+  font-size: clamp(14px, 1.5vw, 18px);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.home-lead-banner small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.home-lead-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.home-lead-actions > a { min-height: 44px; border-radius: 10px; }
+
+@media (max-width: 760px) {
+  .nav { gap: 8px; min-height: 60px; height: auto; padding: 9px 0; }
+  .brand { font-size: clamp(14px, 4.1vw, 18px); gap: 5px; white-space: nowrap; }
+  .brand svg { width: 22px; height: 22px; }
+  .nav .right { gap: 6px; }
+  .nav .navcta { display: none; } /* Advisor lives in the floating control. */
+  .nav .langbtn { min-width: 43px; }
+  .verified-promo { padding: 10px 0 0; }
+  .verified-promo-empty.home-lead-banner { padding: 24px 19px; gap: 12px; min-height: 290px; }
+  .home-lead-banner h1 { font-size: 28px; }
+  .home-lead-actions { width: 100%; }
+  .home-lead-actions > a { flex: 1 1 auto; font-size: 13px; padding: 12px 14px; text-align: center; }
+  .purpose-sec { padding: 30px 0 12px; }
+  .wallets { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .wallet { min-height: 132px; }
+  .wallet .w-pocket { padding: 12px; gap: 4px; }
+  .wallet .w-name { font-size: 14px; }
+  .wallet .w-sub { font-size: 11px; line-height: 1.3; }
+  .wallet .w-ic { width: 29px; height: 29px; }
+  .wallet .w-ic svg { width: 17px; height: 17px; }
+  .floating-lead { display: none; }
+  .floating-advisor { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); padding: 11px 14px; }
+  .floating-zalo { right: 12px; bottom: calc(67px + env(safe-area-inset-bottom)); }
+  .floating-advisor-panel { bottom: calc(73px + env(safe-area-inset-bottom)); height: calc(100dvh - 110px - env(safe-area-inset-bottom)); }
+  .verified-promo-card { padding: 24px 18px 46px; }
+}
