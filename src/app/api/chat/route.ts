@@ -18,7 +18,7 @@ import {
   sanitizeExtraction,
 } from "@/lib/ai/intent";
 import { followUpReply } from "@/lib/ai/questionEngine";
-import type { ConversationContext } from "@/lib/ai/prompts/conversationalAdvisor";
+import type { ConversationContext, SelectedLoanContext } from "@/lib/ai/prompts/conversationalAdvisor";
 import {
   validateProfile,
   type RejectionCode,
@@ -408,6 +408,20 @@ async function converseInlineStream(
   }
 }
 
+function isValidSelectedLoanContext(value: unknown): value is SelectedLoanContext {
+  if (typeof value !== "object" || value === null) return false;
+  const context = value as Record<string, unknown>;
+  return (
+    typeof context.productId === "string" &&
+    context.productId.length > 0 &&
+    context.productId.length <= 160 &&
+    (context.providerId === undefined || (typeof context.providerId === "string" && context.providerId.length <= 160)) &&
+    (context.loanType === undefined || (typeof context.loanType === "string" && context.loanType.length <= 80)) &&
+    (context.amountVnd === undefined || (typeof context.amountVnd === "number" && Number.isInteger(context.amountVnd) && context.amountVnd > 0 && context.amountVnd <= 50_000_000_000)) &&
+    (context.termMonths === undefined || (typeof context.termMonths === "number" && Number.isInteger(context.termMonths) && context.termMonths > 0 && context.termMonths <= 360))
+  );
+}
+
 /**
  * Emit an advisor reply as explanation deltas, substituting the canned
  * fallback when the stream is unavailable, empty, or dies before its first
@@ -462,6 +476,8 @@ export async function POST(request: NextRequest) {
     history?: ConversationTurn[];
     /** Client-held wizard transcript, re-sent each request for the same reason. */
     messages?: ConversationTurn[];
+    /** Public product/amount context from the verified estimator, never identity data. */
+    loanContext?: SelectedLoanContext;
   };
   try {
     body = await request.json();
@@ -547,6 +563,14 @@ export async function POST(request: NextRequest) {
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
+
+  if (body.loanContext !== undefined && !isValidSelectedLoanContext(body.loanContext)) {
+    return new Response(JSON.stringify({ error: "Invalid loan context" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const selectedLoan = body.loanContext;
 
   const llm = getLLMProvider();
   const ragChunks = await getPolicyChunks(runtime.DB);
@@ -743,6 +767,7 @@ export async function POST(request: NextRequest) {
         knownProfile: session.profile,
         missingFields: result.missingFields,
         collateralLoai: session.pendingCollateralLoai,
+        selectedLoan,
       },
       lang,
     );
@@ -803,6 +828,7 @@ export async function POST(request: NextRequest) {
         knownProfile: session.profile,
         rejectionHint,
         collateralLoai: session.pendingCollateralLoai,
+        selectedLoan,
       },
       lang,
     );

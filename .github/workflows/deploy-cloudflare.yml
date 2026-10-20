@@ -120,4 +120,20 @@ jobs:
         run: |
           curl --fail --show-error --silent --retry 5 --retry-delay 5 "$PUBLIC_SITE_URL/"
           curl --fail --show-error --silent --retry 5 --retry-delay 5 "$PUBLIC_SITE_URL/api/catalog"
-          curl --fail --show-error --silent --retry 5 --retry-delay 5 "$PUBLIC_SITE_URL/api/health"
+          health_code=$(curl --show-error --silent --retry 5 --retry-delay 5 -o /tmp/vaytiendanang-health.json -w '%{http_code}' "$PUBLIC_SITE_URL/api/health")
+          case "$health_code" in
+            200) ;;
+            503)
+              # Optional AI/Telegram/Turnstile/Zalo integrations may be absent
+              # in a fresh environment. Deployment is still valid when the
+              # critical data and queue checks are healthy; the response is
+              # deliberately degraded rather than a fake all-green status.
+              grep -q '"database":true' /tmp/vaytiendanang-health.json
+              grep -q '"leadQueue":true' /tmp/vaytiendanang-health.json
+              ;;
+            *)
+              echo "Unexpected health status: $health_code"
+              cat /tmp/vaytiendanang-health.json
+              exit 1
+              ;;
+          esac

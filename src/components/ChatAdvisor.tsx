@@ -38,6 +38,7 @@ import {
   type ConversationTurn,
 } from "@/lib/ai/offerContext";
 import { archiveConversation, loadConversation } from "@/lib/chatHistory";
+import type { SelectedLoanContext } from "@/lib/ai/prompts/conversationalAdvisor";
 
 /* ---------------------------------------------------------------- API types */
 
@@ -338,12 +339,16 @@ export default function ChatAdvisor({
   offerId,
   postId,
   restoreId,
+  embedded = false,
+  loanContext,
 }: {
   seed?: string;
   pkg?: number;
   offerId?: string;
   postId?: string;
   restoreId?: string;
+  embedded?: boolean;
+  loanContext?: SelectedLoanContext;
 }) {
   const router = useRouter();
   const { lang, t, tRaw } = useI18n();
@@ -1294,7 +1299,7 @@ export default function ChatAdvisor({
     }
 
     if (!booted) {
-      const hasNewIntent = seed != null || offerId != null || restoreId != null;
+      const hasNewIntent = seed != null || offerId != null || restoreId != null || loanContext != null;
       const saved = !hasNewIntent ? loadChat() : null;
       // Only restore a saved wizard conversation (saved.offer == null); a saved
       // offer discussion is incompatible with this entry point, so start fresh.
@@ -1378,6 +1383,7 @@ export default function ChatAdvisor({
                   profile: profileRef.current,
                   messages: toTranscript(messagesRef.current),
                 }),
+            ...(loanContext ? { loanContext } : {}),
             ...(affordability ? { affordability } : {}),
           }),
         });
@@ -1534,7 +1540,7 @@ export default function ChatAdvisor({
         addBot(tRef.current("chat_err"));
       }
     },
-    [addBot, addBotForm, addBotApiResult, dropMessage, rerender, scrollChat, setChips, startAffordability, survivalChip],
+    [addBot, addBotForm, addBotApiResult, dropMessage, loanContext, rerender, scrollChat, setChips, startAffordability, survivalChip],
   );
 
   sendToApiChatRef.current = sendToApiChat;
@@ -1584,9 +1590,9 @@ export default function ChatAdvisor({
   /* ---- render ---- */
 
   return (
-    <section id="chatView" className="on">
+    <section id="chatView" className={embedded ? "on chat-embedded" : "on"}>
       <div className="chat-shell">
-        <div className="chat-head">
+        <div className={"chat-head" + (embedded ? " chat-head-embedded" : "")}>
           <div className="av">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="avimg" src="/mascot/vaya-avatar.png" alt="vaytiendanang" />

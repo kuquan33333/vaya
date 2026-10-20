@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import VerifiedPromoCarousel from "@/components/VerifiedPromoCarousel";
 import VerifiedMarketsSection from "@/components/VerifiedMarketsSection";
+import LoanEstimator from "@/components/LoanEstimator";
 import PurposePicker from "@/components/PurposePicker";
 import WhySection from "@/components/WhySection";
 import HowSection from "@/components/HowSection";
@@ -71,6 +72,7 @@ export default function Home() {
         <PurposePicker onPurposeSelect={focusCatalog} />
 
         <VerifiedMarketsSection selectedFilter={catalogFilter} onFilterChange={setCatalogFilter} />
+        <LoanEstimator />
         <WhySection />
         <HowSection />
         <Manifesto />

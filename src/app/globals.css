@@ -3,37 +3,43 @@
 @tailwind utilities;
 
 /* =========================================================================
-   vaytiendanang design system — retained from the source single-file app.
-   Light theme · white bg · green CTAs (#00C776) · Deep Teal ink (#013D3B)
-   SQUARE borders (border-radius:0) · Sora + Plus Jakarta Sans + Noto Sans SC
+   vaytiendanang design system.
+   Light theme · white/red brand surfaces · neutral ink
+   Sora + Plus Jakarta Sans + Noto Sans SC
    ========================================================================= */
 :root {
   --bg: #ffffff;
-  --surface: #f4f7f9;
-  --surface2: #ecf0f3;
+  --surface: #f4f5f7;
+  --surface2: #eaecf0;
   --panel: #ffffff;
-  --line: #e2e8ec;
-  --line-2: #d2dbe0;
-  --ink: #013d3b;
-  --ink-2: #3a5450;
-  --muted: #6c7d79;
-  --muted-2: #95a29f;
-  --green: #00c776;
-  --green-strong: #00a863;
-  /* Filled green surfaces carry text, and #00C776 only reaches 2.23:1 against
-     white — unusable. So the brand green stays for tints, borders, chart
-     strokes and green-on-white text, while filled buttons/badges use this
-     deeper green, which clears AA at 5.42:1 with white on top. */
-  --green-cta: #017a46;
-  --green-cta-h: #01693c;
-  --green-text: #0a8f55;
-  --green-soft: #e7f8f0;
-  --btn-ink: #04231f;
-  --coral: #ff6341;
-  --red: #e5533b;
+  --line: #e4e7ec;
+  --line-2: #d0d5dd;
+  --ink: #242424;
+  --ink-2: #475467;
+  --muted: #667085;
+  --muted-2: #98a2b3;
+  --brand-red: #c62828;
+  --brand-red-dark: #9f1d25;
+  --brand-red-hover: #b71c1c;
+  --brand-red-soft: #fff1f2;
+  /* Legacy variable names remain as compatibility aliases for the existing
+     Vaya components. Status selectors below use the separate success token. */
+  --green: var(--brand-red);
+  --green-strong: var(--brand-red-dark);
+  --green-cta: var(--brand-red-dark);
+  --green-cta-h: var(--brand-red-hover);
+  --green-text: var(--brand-red-dark);
+  --green-soft: var(--brand-red-soft);
+  --status-success: #087443;
+  --status-success-soft: #ecfdf3;
+  --status-warning: #b54708;
+  --status-danger: #b42318;
+  --btn-ink: #242424;
+  --coral: var(--brand-red);
+  --red: var(--status-danger);
   --violet: #8180c8;
   --blue: #2f6bff;
-  --teal: #0fb6b6;
+  --teal: #0b8f8f;
   /* Sora ships only latin + latin-ext (no `vietnamese` subset), so Vietnamese
      diacritics (ả, ấ, ộ, ữ …) fall back to another face and render thinner /
      mis-shaped. "Be Vietnam Pro" covers them, and in VI mode it is promoted to
@@ -5760,4 +5766,299 @@ footer .brand svg {
   .floating-zalo { right: 12px; bottom: calc(67px + env(safe-area-inset-bottom)); }
   .floating-advisor-panel { bottom: calc(73px + env(safe-area-inset-bottom)); height: calc(100dvh - 110px - env(safe-area-inset-bottom)); }
   .verified-promo-card { padding: 24px 18px 46px; }
+}
+
+/* =========================================================================
+   Production red/white refinement
+   These selectors are component-level aliases for the retained Vaya screens;
+   financial status colours remain distinct from the brand red.
+   ========================================================================= */
+.brandmark {
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+.score-head.sc-good,
+.pk-verdict.pk-good,
+.pk-chk.ok,
+.chg.up,
+.sc-ok-msg {
+  color: var(--status-success);
+}
+.score-head.sc-good { border-left-color: var(--status-success); }
+.sc-good .score-num,
+.pk-chk.ok { color: var(--status-success); }
+.mail-card.sent { border-color: var(--status-success); }
+.cmp-table td.cmp-win,
+.rc-fill.cheap { background-color: var(--status-success); }
+.floating-advisor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 78;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(16, 24, 40, 0.28);
+  cursor: default;
+}
+.floating-advisor-panel {
+  z-index: 81;
+  display: flex;
+  flex-direction: column;
+  height: min(620px, calc(100dvh - 150px));
+  max-height: calc(100dvh - 150px);
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  box-shadow: 0 24px 70px rgba(16, 24, 40, 0.28);
+}
+.floating-advisor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+  min-height: 58px;
+  padding: 10px 12px 10px 16px;
+  color: #fff;
+  background: var(--brand-red-dark);
+}
+.floating-advisor-header > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.floating-advisor-header strong { font-size: 14px; }
+.floating-advisor-header span { color: rgba(255,255,255,.76); font-size: 11px; }
+.floating-advisor-actions { position: static; z-index: auto; }
+.floating-advisor-actions > button:first-child {
+  color: var(--brand-red-dark);
+  background: #fff;
+  min-height: 34px;
+}
+.floating-advisor-actions .floating-close,
+.floating-advisor-header .floating-close {
+  position: static;
+  width: 34px;
+  height: 34px;
+  color: #fff;
+  background: rgba(255,255,255,.16);
+}
+.floating-advisor-content {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: #fff;
+}
+.floating-advisor-panel #chatView.on {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+}
+.floating-advisor-panel .chat-shell {
+  height: 100%;
+  min-height: 0;
+  padding: 0 14px;
+}
+.floating-advisor-panel .chat-head-embedded {
+  min-height: 42px;
+  padding: 6px 0;
+}
+.floating-advisor-panel .chat-head-embedded .av,
+.floating-advisor-panel .chat-head-embedded .who {
+  display: none;
+}
+.floating-advisor-panel .chat-head-embedded .hact {
+  width: 100%;
+  margin-left: 0;
+  justify-content: flex-end;
+}
+.floating-advisor-panel .chat-head-embedded .hact .btn {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.floating-advisor-panel .chat-body {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.floating-advisor-panel .chat-input {
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+}
+.floating-advisor-panel .chat-input input { min-width: 0; }
+.floating-advisor { background: var(--brand-red-dark); }
+.floating-advisor:hover { background: var(--brand-red-hover); }
+.floating-advisor span { color: #ffd5d8; }
+.floating-lead { color: var(--brand-red-dark); background: var(--brand-red-soft); }
+.foot-top { color: #ffb4b8; }
+.foot-top:hover { color: #fff; }
+.foot-mark-word { color: #ffb4b8; }
+
+@media (max-width: 760px) {
+  .floating-advisor-panel {
+    right: 10px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: calc(100vw - 20px);
+    height: min(560px, calc(100dvh - 142px));
+    max-height: calc(100dvh - 142px);
+    border-radius: 16px;
+  }
+  .floating-advisor-header { min-height: 54px; padding-left: 14px; }
+  .floating-advisor-actions > button:first-child { font-size: 10px; padding: 6px 8px; }
+  .floating-advisor-panel .chat-head-embedded .hact-human { display: none; }
+  .foot-mark { display: none; }
+  footer { padding-top: 34px; }
+}
+@media (max-width: 380px) {
+  .floating-advisor-header strong { font-size: 13px; }
+  .floating-advisor-actions > button:first-child { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .foot-grid { grid-template-columns: 1fr; gap: 18px; }
+}
+
+/* ---- service carousel -------------------------------------------------- */
+.verified-promo > .wrap { position: relative; }
+.home-service-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, .85fr);
+  align-items: center;
+  gap: clamp(24px, 5vw, 72px);
+  min-height: 430px;
+  padding: clamp(28px, 5vw, 58px);
+  overflow: hidden;
+  color: #fff;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 86% 10%, rgba(255,255,255,.18), transparent 32%),
+    linear-gradient(120deg, var(--brand-red-dark), var(--brand-red) 62%, #e04a4a);
+  box-shadow: 0 22px 50px rgba(159, 29, 37, .2);
+}
+.home-service-copy { min-width: 0; position: relative; z-index: 1; }
+.home-service-copy .sec-tag {
+  color: #fff;
+  border-color: rgba(255,255,255,.35);
+  background: rgba(255,255,255,.12);
+}
+.home-service-copy h1 {
+  max-width: 700px;
+  margin: 14px 0 14px;
+  color: #fff;
+  font-size: clamp(2rem, 5vw, 4.25rem);
+  line-height: 1.02;
+  letter-spacing: -.04em;
+}
+.home-service-copy p { max-width: 640px; color: rgba(255,255,255,.86); font-size: 16px; line-height: 1.6; }
+.home-service-benefits { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 18px 0 22px; padding: 0; list-style: none; }
+.home-service-benefits li { color: #fff; font-size: 13px; }
+.home-service-benefits li::before { content: "✓"; margin-right: 7px; color: #ffd5d8; font-weight: 800; }
+.home-service-copy .btn-ghost { color: var(--brand-red-dark); border-color: #fff; }
+.home-service-copy small { display: block; max-width: 620px; margin-top: 14px; color: rgba(255,255,255,.72); font-size: 11px; line-height: 1.5; }
+.home-service-visual { position: relative; min-height: 300px; display: grid; place-items: center; }
+.loan-phone-mockup {
+  width: min(230px, 70%);
+  padding: 10px;
+  border: 7px solid #242424;
+  border-radius: 30px;
+  background: #242424;
+  box-shadow: 20px 24px 0 rgba(70, 5, 12, .22), 0 22px 48px rgba(41, 7, 10, .3);
+  transform: rotate(5deg);
+}
+.loan-phone-top { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 10px; color: #fff; font-size: 9px; font-weight: 700; }
+.loan-phone-top i { width: 30px; height: 5px; border-radius: 99px; background: #555; }
+.loan-phone-screen { display: grid; gap: 9px; padding: 17px 14px 22px; min-height: 260px; border-radius: 20px; background: #fff; color: var(--ink); }
+.loan-phone-screen b { font-size: 13px; line-height: 1.2; }
+.loan-phone-screen span { color: var(--muted); font-size: 9px; }
+.loan-phone-screen strong { padding: 10px; border-radius: 8px; background: var(--brand-red-soft); color: var(--brand-red-dark); font-size: 15px; }
+.loan-phone-screen em { margin-top: auto; color: var(--muted); font-size: 8px; line-height: 1.4; font-style: normal; }
+.service-orbit { position: absolute; display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; color: #fff; font-size: 18px; font-weight: 800; background: rgba(255,255,255,.12); }
+.service-orbit-one { top: 14%; right: 7%; }
+.service-orbit-two { bottom: 12%; left: 6%; }
+.verified-promo-controls {
+  position: static;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  color: var(--muted);
+}
+.verified-promo-controls button { flex: 0 0 auto; color: var(--brand-red-dark); }
+.verified-promo-dots { display: flex; align-items: center; gap: 5px; }
+.verified-promo-dots button { width: 8px; height: 8px; padding: 0; border: 0; background: #d0d5dd; }
+.verified-promo-dots button.on { width: 22px; border-radius: 99px; background: var(--brand-red); }
+
+/* ---- verified calculator ---------------------------------------------- */
+.loan-estimator-section { padding-top: 28px; background: var(--surface); }
+.loan-estimator-card { padding: clamp(22px, 4vw, 42px); border: 1px solid var(--line); border-radius: 22px; background: #fff; box-shadow: 0 16px 40px rgba(16,24,40,.06); }
+.loan-estimator-heading { max-width: 720px; margin-bottom: 26px; }
+.loan-estimator-heading h2 { margin: 9px 0 8px; font-size: clamp(1.8rem, 4vw, 3rem); }
+.loan-estimator-heading p { color: var(--muted); line-height: 1.6; }
+.loan-estimator-grid { display: grid; grid-template-columns: minmax(0, .95fr) minmax(300px, 1.05fr); gap: clamp(22px, 4vw, 48px); align-items: start; }
+.loan-estimator-controls { min-width: 0; }
+.loan-estimator-controls .fq { margin-bottom: 16px; }
+.loan-estimator-controls .fq input,
+.loan-estimator-controls .fq select { border-radius: 10px; height: 46px; }
+.loan-estimator-range { width: 100%; margin: -7px 0 2px; accent-color: var(--brand-red); }
+.loan-estimator-range:disabled { opacity: .35; }
+.loan-estimator-range-note { display: block; margin: 0 0 13px; color: var(--muted); font-size: 11px; }
+.loan-methods { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 18px 0 0; padding: 0; border: 0; color: var(--ink-2); font-size: 12px; }
+.loan-methods legend { width: 100%; margin-bottom: 3px; color: var(--ink-2); font-size: 12.5px; font-weight: 600; }
+.loan-methods label { display: inline-flex; align-items: center; gap: 6px; }
+.loan-methods input { accent-color: var(--brand-red); }
+.loan-estimator-result { min-width: 0; padding: 22px; border-radius: 16px; background: var(--brand-red-dark); color: #fff; }
+.loan-estimator-selected { display: grid; gap: 2px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,.2); }
+.loan-estimator-selected b { font-size: 15px; }
+.loan-estimator-selected span { color: rgba(255,255,255,.74); font-size: 12px; }
+.loan-result-primary { display: grid; gap: 4px; padding: 18px 0; }
+.loan-result-primary span, .loan-result-facts span { color: rgba(255,255,255,.7); font-size: 11px; }
+.loan-result-primary strong { font-size: clamp(1.55rem, 4vw, 2.4rem); line-height: 1.1; }
+.loan-result-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.loan-result-facts > div { display: grid; gap: 5px; min-width: 0; padding: 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; }
+.loan-result-facts b { font-size: 12px; overflow-wrap: anywhere; }
+.loan-estimator-source { margin: 16px 0 0; color: rgba(255,255,255,.72); font-size: 11px; line-height: 1.5; }
+.loan-estimator-empty { display: grid; gap: 8px; min-height: 164px; align-content: center; }
+.loan-estimator-empty strong { font-size: 16px; }
+.loan-estimator-empty span { color: rgba(255,255,255,.72); font-size: 12px; line-height: 1.55; }
+.loan-estimator-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+.loan-estimator-actions .btn { min-height: 44px; flex: 1 1 180px; padding-inline: 13px; text-align: center; }
+.loan-estimator-actions .btn-ghost { color: var(--brand-red-dark); }
+.loan-estimator-disclaimer { display: block; margin-top: 15px; color: rgba(255,255,255,.58); font-size: 10.5px; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .home-service-banner { grid-template-columns: 1fr; gap: 12px; min-height: 0; padding: 25px 19px 18px; border-radius: 18px; }
+  .home-service-copy h1 { font-size: clamp(2rem, 9vw, 2.8rem); }
+  .home-service-copy p { font-size: 14px; }
+  .home-service-benefits { display: grid; gap: 6px; margin: 15px 0 18px; }
+  .home-service-visual { min-height: 225px; }
+  .loan-phone-mockup { width: 170px; border-width: 5px; border-radius: 24px; }
+  .loan-phone-screen { min-height: 190px; padding: 13px 11px 16px; }
+  .loan-phone-screen strong { padding: 7px; }
+  .loan-estimator-grid { grid-template-columns: 1fr; }
+  .loan-estimator-card { padding: 22px 17px; border-radius: 17px; }
+  .loan-estimator-result { padding: 17px; }
+  .loan-result-facts { grid-template-columns: 1fr; }
+  .loan-result-facts > div { grid-template-columns: 1fr auto; align-items: center; }
+}
+
+/* ---- registration context and mobile form ergonomics ------------------ */
+.registration-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 820px; margin: 0 auto 14px; padding: 0; list-style: none; color: var(--muted); font-size: 12px; }
+.registration-steps li { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.registration-steps span { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 auto; border-radius: 50%; background: var(--surface2); color: var(--muted); font-weight: 800; }
+.registration-steps li.on { color: var(--brand-red-dark); font-weight: 700; }
+.registration-steps li.on span { color: #fff; background: var(--brand-red-dark); }
+.registration-context { display: grid; gap: 6px; max-width: 820px; margin: 0 auto 14px; padding: 15px 17px; border: 1px solid #f5c2c7; border-radius: 13px; background: var(--brand-red-soft); color: var(--brand-red-dark); }
+.registration-context > span { color: var(--ink-2); font-size: 13px; line-height: 1.45; }
+.registration-context-facts { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--ink-2); font-size: 12px; }
+.registration-context-facts b { color: var(--ink); }
+.registration-form .fq input:focus,
+.registration-form .fq select:focus,
+.registration-form .fq textarea:focus { border-color: var(--brand-red); box-shadow: 0 0 0 3px rgba(198,40,40,.12); }
+.registration-form .consent-row input { accent-color: var(--brand-red); }
+.registration-form .consent-row a { color: var(--brand-red-dark); }
+@media (max-width: 520px) {
+  .registration-steps { font-size: 10.5px; gap: 5px; }
+  .registration-steps li { align-items: flex-start; line-height: 1.25; }
+  .registration-steps span { width: 22px; height: 22px; }
+  .registration-form { padding: 18px 14px; border-radius: 14px; }
+  .registration-form .btn { width: 100%; min-height: 48px; }
 }

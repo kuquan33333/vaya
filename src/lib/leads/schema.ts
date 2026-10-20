@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const sourceValues = ["banner", "card", "detail", "ai", "market", "human", "checklist", "organic"] as const;
+const sourceValues = ["banner", "card", "detail", "ai", "market", "human", "checklist", "calculator", "organic"] as const;
 
 export const LeadInputSchema = z.object({
   fullName: z.string().trim().min(2).max(120),

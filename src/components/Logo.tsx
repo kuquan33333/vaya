@@ -3,12 +3,21 @@
 import React from "react";
 
 /**
- * vaytiendanang brand mark — the green pixel-arrow logo.
+ * vaytiendanang brand mark. The mark is kept as inline SVG so the public
+ * identity follows the red/white design tokens without an image filter or a
+ * second raster asset that can render stale on a CDN.
  */
 export function Logo() {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img className="brandmark" src="/logo.png" alt="vaytiendanang" />
+    <svg className="brandmark" viewBox="0 0 32 32" role="img" aria-label="vaytiendanang" xmlns="http://www.w3.org/2000/svg">
+      <rect x="5.50" y="2.50" width="7" height="7" transform="rotate(45 9 6)" fill="#C62828" />
+      <rect x="11.50" y="7.50" width="7" height="7" transform="rotate(45 15 11)" fill="#C62828" />
+      <rect x="17.00" y="12.00" width="8" height="8" transform="rotate(45 21 16)" fill="#9F1D25" />
+      <rect x="11.50" y="17.50" width="7" height="7" transform="rotate(45 15 21)" fill="#C62828" />
+      <rect x="5.50" y="22.50" width="7" height="7" transform="rotate(45 9 26)" fill="#C62828" />
+      <rect x="1.50" y="9.30" width="3.4" height="3.4" transform="rotate(45 3.2 11)" fill="#F28B8B" />
+      <rect x="1.50" y="19.30" width="3.4" height="3.4" transform="rotate(45 3.2 21)" fill="#F28B8B" />
+    </svg>
   );
 }
 

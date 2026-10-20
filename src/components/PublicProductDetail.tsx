@@ -22,8 +22,8 @@ export default function PublicProductDetail({ slug }: { slug: string }) {
   const selected = useCatalogCompare();
   const [product, setProduct] = useState<CatalogProduct | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [amount, setAmount] = useState("100000000");
-  const [term, setTerm] = useState("24");
+  const [amount, setAmount] = useState("");
+  const [term, setTerm] = useState("");
 
   useEffect(() => {
     fetch(`/api/products/${encodeURIComponent(slug)}`)
@@ -33,19 +33,25 @@ export default function PublicProductDetail({ slug }: { slug: string }) {
       })
       .then((value) => {
         setProduct(value);
+        setAmount(value.minAmountVnd != null ? String(value.minAmountVnd) : "");
+        setTerm(value.minTermMonths != null ? String(value.minTermMonths) : "");
         setState("ready");
       })
       .catch(() => setState("error"));
   }, [slug]);
 
+  const amountNumber = Number(amount);
+  const termNumber = Number(term);
+  const amountValid = Boolean(product && amountNumber > 0 && (product.minAmountVnd == null || amountNumber >= product.minAmountVnd) && (product.maxAmountVnd == null || amountNumber <= product.maxAmountVnd));
+  const termValid = Boolean(product && Number.isInteger(termNumber) && termNumber > 0 && (product.minTermMonths == null || termNumber >= product.minTermMonths) && (product.maxTermMonths == null || termNumber <= product.maxTermMonths));
   const calculation = useMemo(() => {
-    if (!product) return null;
+    if (!product || !amountValid || !termValid) return null;
     return calculateCatalogProduct({
       product,
-      principalVnd: Math.max(1, Number(amount) || 1),
-      termMonths: Math.max(1, Number(term) || 1),
+      principalVnd: amountNumber,
+      termMonths: termNumber,
     });
-  }, [amount, product, term]);
+  }, [amountNumber, amountValid, product, termNumber, termValid]);
 
   if (state === "loading") return <section className="pageview on"><div className="wrap" style={{ padding: "70px 0" }}>Đang tải điều khoản đã xác minh…</div></section>;
   if (state === "error" || !product) return <section className="pageview on"><div className="wrap" style={{ padding: "70px 0" }}><h2>Không tìm thấy sản phẩm đã xác minh</h2><p>Sản phẩm chưa được kiểm chứng hoặc đã hết hiệu lực, nên không thể hiển thị thay bằng dữ liệu khác.</p><button className="btn btn-green" onClick={() => router.push("/#markets")}>Quay lại catalog</button></div></section>;
