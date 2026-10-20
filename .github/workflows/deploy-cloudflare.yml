@@ -37,9 +37,10 @@ jobs:
       - run: npm run build:vinext
 
   deploy:
+    # PR/feature pushes run validation only. Production deploys after merge to master
+    # or an explicit workflow_dispatch; never deploy an unreviewed feature branch.
     if: >-
-      (github.event_name == 'push' && (github.ref == 'refs/heads/master' ||
-      github.ref == 'refs/heads/feat/vaytiendanang-cloudflare-full')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
       github.event_name == 'workflow_dispatch'
     needs: validate
     runs-on: ubuntu-latest
