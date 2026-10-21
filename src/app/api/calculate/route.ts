@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LoanProfileSchema } from "@/lib/validation/profileSchema";
-import { runCalculation } from "@/lib/engine/pipeline";
-
-const AS_OF_DATE = "2025-07-24";
-
-const ASSUMPTIONS = [
-  `Tính toán điểm xếp hạng dựa trên lãi suất và điều kiện vay cập nhật ngày ${AS_OF_DATE}.`,
-  `Tỷ lệ DTI tối đa được áp dụng là 60% thu nhập hàng tháng.`,
-];
+import { getCloudflareEnv } from "@/lib/cloudflare/env";
+import { loadCatalog, publicProducts } from "@/lib/catalog/service";
+import { emptyCatalogScoreLog, rankCatalogProducts } from "@/lib/catalog/ranking";
 
 /**
  * POST /api/calculate
@@ -39,18 +34,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const scoreLog = runCalculation({
+  const calculationProfile = {
     ...profile,
     thoi_han_thang: profile.thoi_han_thang,
     thu_nhap_hang_thang: profile.thu_nhap_hang_thang,
-  });
+  };
+  const snapshot = await loadCatalog(getCloudflareEnv().DB);
+  const products = publicProducts(snapshot.products);
+  const scoreLog = products.length > 0
+    ? rankCatalogProducts(calculationProfile, products)
+    : emptyCatalogScoreLog(
+        calculationProfile,
+        "Chưa có sản phẩm đã xác minh trong catalog D1; không dùng dữ liệu mẫu để xếp hạng.",
+      );
+  const observedDates = products
+    .flatMap((product) => [product.observedAt, product.verifiedAt])
+    .filter((date): date is string => Boolean(date))
+    .sort()
+    .reverse();
 
   return NextResponse.json({
     valid: true,
     missingFields: [],
     ranked: scoreLog.ranked,
     rejected: scoreLog.rejected,
-    assumptions: ASSUMPTIONS,
-    asOfDate: AS_OF_DATE,
+    assumptions: [
+      "Chỉ xếp hạng sản phẩm có nguồn, cơ sở lãi suất và trạng thái verified trong D1.",
+      "DTI tối đa là 60% = (khoản trả đầu kỳ + nợ hiện tại) / thu nhập tháng.",
+      "Phí chưa có nguồn được giữ là chưa biết và không được tự bù vào tổng chi phí.",
+      "Các cơ sở lãi suất khác nhau được xếp hạng theo nhóm riêng, không coi %/tháng và %/năm là cùng một thước đo.",
+    ],
+    asOfDate: observedDates[0] ?? null,
+    catalogReady: scoreLog.catalogReady,
+    dataStatus: scoreLog.dataStatus,
+    message: scoreLog.catalogMessage ?? null,
   });
 }

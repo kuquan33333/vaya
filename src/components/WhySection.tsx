@@ -6,21 +6,15 @@ import Underlined from "@/components/Underlined";
 import MagicBento from "@/components/reactbits/MagicBento";
 import type { BentoCardProps } from "@/components/reactbits/MagicBento";
 
-const BANKS_COMPARE = [
-  { code: "MB", name: "MB Bank", rate: "5.99%" },
-  { code: "TCB", name: "Techcombank", rate: "6.2%" },
-  { code: "VCB", name: "Vietcombank", rate: "6.45%" },
-] as const;
-
-function BankCompareMedia() {
+function BankCompareMedia({ pending, basis }: { pending: string; basis: string }) {
+  const rows = ["01", "02", "03"];
   return (
     <ul className="wb-banks">
-      {BANKS_COMPARE.map((b) => (
-        <li key={b.code} className="wb-banks__row">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="wb-banks__logo" src={`/banks/${b.code}.png`} alt="" />
-          <span className="wb-banks__name">{b.name}</span>
-          <span className="wb-banks__rate">{b.rate}</span>
+      {rows.map((row) => (
+        <li key={row} className="wb-banks__row">
+          <span className="wb-banks__logo wb-banks__logo--empty" aria-hidden="true">{row}</span>
+          <span className="wb-banks__name">{pending}</span>
+          <span className="wb-banks__rate">{basis}</span>
         </li>
       ))}
     </ul>
@@ -45,6 +39,8 @@ function PrivacyMedia({
   name,
   phone,
   email,
+  inputOnly,
+  notSent,
 }: Record<string, string>) {
   return (
     <div className="wb-privacy">
@@ -52,30 +48,30 @@ function PrivacyMedia({
         <div className="wb-privacy__head">✓ {banksGet}</div>
         <div className="wb-privacy__row">
           <span>{amount}</span>
-          <strong>₫ 2,400,000,000</strong>
+          <strong>{inputOnly}</strong>
         </div>
         <div className="wb-privacy__row">
           <span>{term}</span>
-          <strong>240</strong>
+          <strong>{inputOnly}</strong>
         </div>
         <div className="wb-privacy__row">
           <span>{income}</span>
-          <strong>₫ 50–100M/mo</strong>
+          <strong>{inputOnly}</strong>
         </div>
       </div>
       <div className="wb-privacy__col wb-privacy__col--no">
         <div className="wb-privacy__head">✕ {never}</div>
         <div className="wb-privacy__row">
           <span>{name}</span>
-          <strong className="wb-privacy__dots">········</strong>
+          <strong className="wb-privacy__dots">{notSent}</strong>
         </div>
         <div className="wb-privacy__row">
           <span>{phone}</span>
-          <strong className="wb-privacy__dots">········</strong>
+          <strong className="wb-privacy__dots">{notSent}</strong>
         </div>
         <div className="wb-privacy__row">
           <span>{email}</span>
-          <strong className="wb-privacy__dots">········</strong>
+          <strong className="wb-privacy__dots">{notSent}</strong>
         </div>
       </div>
     </div>
@@ -86,25 +82,31 @@ function EstimatesMedia({
   monthly,
   interest,
   rate,
+  monthlyValue,
+  interestValue,
+  rateValue,
 }: {
   monthly: string;
   interest: string;
   rate: string;
+  monthlyValue: string;
+  interestValue: string;
+  rateValue: string;
 }) {
   return (
     <div className="wb-est">
       <div className="wb-est__stats">
         <div>
           <span>{monthly}</span>
-          <strong>₫ 17.4tr</strong>
+        <strong>{monthlyValue}</strong>
         </div>
         <div>
           <span>{interest}</span>
-          <strong>₫ 1,780tr</strong>
+        <strong>{interestValue}</strong>
         </div>
         <div>
           <span>{rate}</span>
-          <strong className="wb-est__green">5.99%</strong>
+        <strong className="wb-est__green">{rateValue}</strong>
         </div>
       </div>
       <svg className="wb-est__chart" viewBox="0 0 320 88" preserveAspectRatio="none" aria-hidden="true">
@@ -155,7 +157,7 @@ function LanguagesMedia() {
 function FreeMedia({ sub }: { sub: string }) {
   return (
     <div className="wb-free">
-      <div className="wb-free__zero">₫0</div>
+      <div className="wb-free__zero">✓</div>
       <p className="wb-free__sub">{sub}</p>
     </div>
   );
@@ -171,7 +173,7 @@ export default function WhySection() {
         title: t("w1t"),
         description: t("w1d"),
         color: "#ffffff",
-        media: <BankCompareMedia />,
+        media: <BankCompareMedia pending={t("wb_source_pending")} basis={t("wb_source_basis")} />,
       },
       {
         label: "02",
@@ -195,6 +197,8 @@ export default function WhySection() {
             name={t("wb_name")}
             phone={t("wb_phone")}
             email={t("wb_email")}
+            inputOnly={t("wb_input_only")}
+            notSent={t("wb_not_sent")}
           />
         ),
       },
@@ -208,6 +212,9 @@ export default function WhySection() {
             monthly={t("wb_monthly")}
             interest={t("wb_interest")}
             rate={t("wb_rate")}
+            monthlyValue={t("wb_enter_to_calculate")}
+            interestValue={t("wb_unknown_fee")}
+            rateValue={t("wb_basis_required")}
           />
         ),
       },

@@ -18,6 +18,16 @@ export interface ConversationContext {
   rejectionHint?: string;
   /** Asset class the customer offered as collateral without stating its value. */
   collateralLoai?: string;
+  /** Public catalog context selected by the customer; contains no identity data. */
+  selectedLoan?: SelectedLoanContext;
+}
+
+export interface SelectedLoanContext {
+  productId: string;
+  providerId?: string;
+  loanType?: string;
+  amountVnd?: number;
+  termMonths?: number;
 }
 
 /* Human-readable meanings of internal identifiers, so the model can talk
@@ -85,8 +95,12 @@ export function conversationalAdvisorPrompt(
   const missing = (context.missingFields ?? [])
     .map((f) => FIELD_MEANINGS[f])
     .filter((m): m is string => Boolean(m));
+  const selected = context.selectedLoan;
+  const selectedText = selected
+    ? `- Selected catalog product: ${selected.productId}${selected.providerId ? ` (provider ${selected.providerId})` : ""}${selected.loanType ? `; type ${selected.loanType}` : ""}${selected.amountVnd ? `; requested amount ${selected.amountVnd} VND` : ""}${selected.termMonths ? `; requested term ${selected.termMonths} months` : ""}`
+    : "- No catalog product was selected";
 
-  return `You are Vaya, a professional, friendly Vietnamese financial advisor in an ongoing conversation with a customer. Behave like a normal, helpful assistant — natural, contextual, remembering what was said earlier in this conversation — but your domain is personal finance and loans in Vietnam.
+  return `You are vaytiendanang, a professional, friendly Vietnamese financial advisor in an ongoing conversation with a customer. Behave like a normal, helpful assistant — natural, contextual, remembering what was said earlier in this conversation — but your domain is personal finance and loans in Vietnam.
 
 DOMAIN FOCUS
 - Help with loans, borrowing capacity, bank policies, repayment planning, collateral (vay thế chấp vs vay tín chấp), and related personal-finance questions.
@@ -98,10 +112,12 @@ ${known || "(nothing yet)"}
 - Still needed before concrete numbers can be calculated: ${missing.length ? missing.join("; ") : "nothing"}
 ${context.rejectionHint ? `- Note about their last input: ${context.rejectionHint}` : ""}
 ${context.collateralLoai ? `- Collateral on the table: the customer offered ${ASSET_MEANINGS[context.collateralLoai] ?? context.collateralLoai} to secure the loan, but has NOT stated its value. Ask for the estimated value naturally — strong collateral can qualify the loan on asset coverage even with low or no income, so this may be their key to eligibility. Never invent bank minimum amounts, never talk the customer out of pledging it.` : ""}
+${selectedText}
 
 RULES
 - Ground your advice in the BANK POLICY EXCERPTS below; when you rely on one, mention the bank naturally. If the excerpts do not cover the topic, give sensible general guidance — never invent bank-specific rates, fees, or conditions.
 - NEVER calculate numbers (monthly payments, interest, DTI, eligibility) and never invent figures. Concrete numbers come from the calculation engine once the required details are known. Asking for a missing detail is how the customer gets real numbers.
+- Treat the selected catalog product ID and requested amount/term as context only. Do not invent provider terms from the ID; use verified catalog/policy excerpts or tell the customer that the data is unavailable.
 - When details are missing: first respond to what the customer actually said, then ask for the next one or two missing details naturally, woven into the reply. Never output a bare form-like question, never mention internal field names, never ask for something already known.
 - Solve real-life situations (studying, medical needs, business, no income but owning assets, and similar): explain realistic options, trade-offs, and what banks typically require, using the excerpts when relevant.
 - NEVER invent bank-specific rules (minimum loan amounts, age limits, accepted collateral) that are not in the excerpts or conversation state. When unsure, ask for the missing detail instead of speculating.

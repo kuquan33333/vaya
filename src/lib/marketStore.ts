@@ -10,8 +10,7 @@
  * find the banks have bid.
  */
 import { useSyncExternalStore } from "react";
-import { BIDDERS, type MarketOffer, type MarketPost } from "@/data/marketplace";
-import type { Purpose } from "@/data/banks";
+import type { MarketPost } from "@/data/marketplace";
 
 const KEY = "vaya_market_posts";
 const EMPTY: MarketPost[] = [];
@@ -25,16 +24,6 @@ function emit() {
   // See compareStore: no `target` in tsconfig means ES5, which cannot iterate a
   // Set with for..of.
   subs.forEach((cb) => cb());
-}
-
-function commit(next: MarketPost[]) {
-  posts = next;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(posts));
-  } catch {
-    /* private mode — the board still works for this session */
-  }
-  emit();
 }
 
 function read(): MarketPost[] {
@@ -92,80 +81,9 @@ export function getPosts(): MarketPost[] {
   return posts;
 }
 
-/** Four hex characters, so a borrower is identifiable on the board but not identified. */
-function handle(): string {
-  return Math.floor(Math.random() * 0xffff)
-    .toString(16)
-    .toUpperCase()
-    .padStart(4, "0");
-}
-
-export type NewPost = {
-  purpose: Purpose;
-  amount: number;
-  termMonths: number;
-  incomeBand: string;
-  collateral: boolean;
-  note?: string;
-};
-
-export function addPost(p: NewPost): string {
-  const id = "u" + Date.now().toString(36);
-  const post: MarketPost = {
-    id,
-    handle: handle(),
-    purpose: p.purpose,
-    amount: p.amount,
-    termMonths: p.termMonths,
-    incomeBand: p.incomeBand,
-    collateral: p.collateral,
-    verified: p.collateral
-      ? ["mk_v_income", "mk_v_collateral"]
-      : ["mk_v_income"],
-    note: p.note?.trim() || undefined,
-    hoursAgo: 0,
-    offers: [],
-    mine: true,
-  };
-  commit([post, ...posts]);
-  return id;
-}
-
-export function removePost(id: string) {
-  commit(posts.filter((p) => p.id !== id));
-}
-
 /**
- * Stage one bank's reply. `n` selects which bidder in the purpose's list
- * answers, so repeated calls produce a race rather than duplicate quotes.
+ * There is deliberately no local post/bid creator. A provider offer is a
+ * regulated, time-sensitive fact and must arrive through the reviewed D1
+ * workflow. This store only reads old, user-owned local posts so existing
+ * offer discussions can be reopened without inventing a quote.
  */
-export function addBid(postId: string, n: number) {
-  const post = posts.find((p) => p.id === postId);
-  if (!post) return;
-  const pool = BIDDERS[post.purpose] || [];
-  const bid = pool[n % pool.length];
-  if (!bid || post.offers.some((x) => x.code === bid.code)) return;
-
-  // Later bidders undercut slightly — they can see they are behind.
-  const undercut = n * 0.08;
-  const offer: MarketOffer = {
-    id: postId + "o" + n,
-    code: bid.code,
-    rate: Number((bid.listed - bid.cut - undercut).toFixed(2)),
-    listed: bid.listed,
-    termMonths: post.termMonths,
-    maxAmount: post.amount,
-    conditions: bid.conditions,
-    hoursAgo: 0,
-    expiresInH: 48,
-  };
-  commit(
-    posts.map((p) =>
-      p.id === postId ? { ...p, offers: [...p.offers, offer] } : p,
-    ),
-  );
-}
-
-export function clearPosts() {
-  if (posts.length) commit(EMPTY);
-}

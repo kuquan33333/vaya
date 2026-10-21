@@ -3,11 +3,11 @@
 // Wallet-pocket loan-purpose tiles (main-page quick entry): a white "card"
 // peeking from a colored pocket, white line icon, label + starting rate. Each
 // tile opens the chat advisor seeded with that purpose.
-import React from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/I18nProvider";
-import { PKG, purpName, type Purpose } from "@/data/banks";
-import type { Lang } from "@/i18n/dict";
+import { purpName, type Purpose } from "@/data/banks";
+import { fetchPublicCatalog } from "@/lib/catalog/client";
+import type { CatalogProduct } from "@/lib/catalog/types";
 
 const WALLET: [Purpose, string][] = [
   ["home", "#00A863"],
@@ -46,23 +46,39 @@ const WICON: Record<Purpose, React.ReactNode> = {
   ),
 };
 
-const ASK: Record<Purpose, Record<Lang, string>> = {
-  home: { en: "I want a home loan", vi: "Tôi muốn vay mua nhà", zh: "我想申请购房贷款" },
-  car: { en: "I want a car loan", vi: "Tôi muốn vay mua ô tô", zh: "我想申请购车贷款" },
-  business: { en: "I need business capital", vi: "Tôi cần vốn kinh doanh", zh: "我需要经营资金" },
-  personal: { en: "I want a personal loan", vi: "Tôi muốn vay tiêu dùng", zh: "我想申请个人贷款" },
-  secured: { en: "I want a secured loan", vi: "Tôi muốn vay có tài sản đảm bảo", zh: "我想申请抵押贷款" },
-};
-
-export default function PurposePicker() {
-  const router = useRouter();
+export default function PurposePicker({
+  onPurposeSelect,
+}: {
+  onPurposeSelect?: (purpose: Purpose) => void;
+}) {
   const { lang, t } = useI18n();
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
 
-  const minRate = (p: Purpose): number => {
-    const rs = PKG.filter((x) => x.purpose === p).map((x) => x.rate);
-    return rs.length ? Math.min(...rs) : 0;
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchPublicCatalog(controller.signal)
+      .then((catalog) => setProducts(catalog.products))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  const productCount = (purpose: Purpose): number => {
+    const categories = purpose === "personal"
+      ? new Set(["unsecured", "cash", "motorbike-installment", "phone-appliance-installment", "goods-service-installment"])
+      : purpose === "home"
+        ? new Set(["home", "secured"])
+        : purpose === "car"
+          ? new Set(["car", "motorbike-installment"])
+          : purpose === "business"
+            ? new Set(["business", "secured"])
+            : new Set(["secured"]);
+    return products.filter((product) => product.purposeCode === purpose || categories.has(product.category)).length;
   };
-  const open = (p: Purpose) => router.push(`/chat?q=${encodeURIComponent(ASK[p][lang] || ASK[p].en)}`);
+
+  const open = (p: Purpose) => {
+    onPurposeSelect?.(p);
+    requestAnimationFrame(() => document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   return (
     <section className="section purpose-sec">
@@ -88,7 +104,9 @@ export default function PurposePicker() {
                 </span>
                 <span className="w-name">{purpName(p, lang)}</span>
                 <span className="w-sub">
-                  {t("from")} {minRate(p)}%/{t("yr")}
+                  {productCount(p) > 0
+                    ? t("pp_verified").replace("{count}", String(productCount(p)))
+                    : t("rate_pending")}
                 </span>
               </span>
             </button>

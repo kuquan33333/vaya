@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
-import { PKG, bankOf, prodName, logoSrc, type Purpose } from "@/data/banks";
+import { type Purpose } from "@/data/banks";
 import { fmtMonthly, monthly } from "@/lib/loanEngine";
 import {
   monteCarlo,
@@ -17,7 +17,6 @@ import {
 import SurvivalChart from "@/components/charts/SurvivalChart";
 import Term from "@/components/Term";
 import { SURV_FORM_KEY, parseNum as NUM } from "@/lib/savedProfile";
-import type { Lang } from "@/i18n/dict";
 
 /** Number of Monte-Carlo paths. Shared by the headline simulation and the
  * improvement-suggestion re-simulations so their scores stay comparable. */
@@ -47,16 +46,10 @@ const COL = [
 ];
 
 export default function SurvivalScore() {
-  const { lang, t } = useI18n();
+  const { t } = useI18n();
   const sp = useSearchParams();
-  const pkgParam = sp.get("pkg");
   const bankParam = sp.get("bank");
   const fromChat = bankParam != null || sp.get("a") != null;
-  const initPkg =
-    pkgParam != null && PKG[parseInt(pkgParam, 10)]
-      ? parseInt(pkgParam, 10)
-      : null;
-  const seed = initPkg != null ? PKG[initPkg] : null;
 
   // Load persisted financial profile from localStorage (NOT pkg/amount/term)
   const saved = useMemo(() => {
@@ -68,15 +61,12 @@ export default function SurvivalScore() {
     }
   }, []);
 
-  // URL ?pkg= always overrides; otherwise no pre-selected package
-  const [pkgSel, setPkgSel] = useState<number | null>(initPkg);
   const [f, setF] = useState(() => {
     const base = {
-      purpose: seed ? seed.purpose : sp.get("p") || "home",
-      amount: String(
-        seed ? Math.min(seed.max, 2000000000) : sp.get("a") || "2000000000",
-      ),
-      term: String(seed ? Math.min(seed.term, 240) : sp.get("t") || "240"),
+      purpose: sp.get("p") || "home",
+      amount: sp.get("a") || "2000000000",
+      term: sp.get("t") || "240",
+      annualRate: sp.get("r") || "",
       income: sp.get("i") || "45000000",
       expenses: fromChat ? "" : "18000000",
       debt: fromChat ? "" : "4000000",
@@ -98,6 +88,7 @@ export default function SurvivalScore() {
         "dependents",
         "employment",
         "collateral",
+        "annualRate",
       ] as const;
       for (const k of finKeys) {
         if (saved[k] != null) base[k] = saved[k];
@@ -130,6 +121,7 @@ export default function SurvivalScore() {
         dependents,
         employment,
         collateral,
+        annualRate,
       } = f;
       localStorage.setItem(
         SURV_FORM_KEY,
@@ -142,6 +134,7 @@ export default function SurvivalScore() {
           dependents,
           employment,
           collateral,
+          annualRate,
         }),
       );
     } catch {
@@ -152,61 +145,18 @@ export default function SurvivalScore() {
   const set = (k: string, v: string) =>
     setF((o: typeof f) => ({ ...o, [k]: v }));
 
-  // Packages filtered by current purpose
-  const pkgsForPurpose = useMemo(
-    () =>
-      PKG.map((p, i) => ({ ...p, idx: i })).filter(
-        (p) => p.purpose === f.purpose,
-      ),
-    [f.purpose],
-  );
-
-  // Pre-select bank package when arriving from chat with a bank param
-  useEffect(() => {
-    if (!bankParam) return;
-    const match = pkgsForPurpose.find(
-      (p) => bankOf(p.code).name.toLowerCase() === bankParam.toLowerCase(),
-    );
-    if (match) setPkgSel(match.idx);
-  }, [bankParam, pkgsForPurpose]);
-
-  // Active package policy
-  const activePkg = pkgSel != null ? PKG[pkgSel] : null;
-
-  // Select a package and clamp values to its policy
-  const selectPkg = (idx: number | null) => {
-    setPkgSel(idx);
-    if (idx != null) {
-      const p = PKG[idx];
-      setF((o: typeof f) => ({
-        ...o,
-        amount: String(Math.min(NUM(o.amount), p.max)),
-        term: String(Math.min(NUM(o.term), p.term)),
-      }));
-    }
-  };
-
-  const run = (pkgOverride?: number | null) => {
-    const pk = pkgOverride === undefined ? pkgSel : pkgOverride;
+  const run = () => {
     const amount = NUM(f.amount);
     const term = NUM(f.term);
     const income = NUM(f.income);
+    const rate = NUM(f.annualRate);
 
     // Validate inputs — errors keyed to field name
     const fe: Record<string, string> = {};
     let emiBd: typeof emiBreakdown = null;
-    const pkg = pk != null ? PKG[pk] : null;
     if (amount <= 0) fe.amount = t("err_amount_zero");
     if (income <= 0) fe.income = t("err_income_zero");
-    if (pkg && amount > pkg.max)
-      fe.amount = t("err_over_max")
-        .replace("{max}", (pkg.max / 1e9).toFixed(1) + "B")
-        .replace("{bank}", bankOf(pkg.code).name);
-    if (pkg && term > pkg.term)
-      fe.term = t("err_over_term")
-        .replace("{max}", String(pkg.term))
-        .replace("{bank}", bankOf(pkg.code).name);
-    const rate = pkg ? pkg.std || pkg.rate : NUM(sp.get("r")) || 10;
+    if (rate <= 0) fe.annualRate = t("err_rate_zero");
     const emiVal = monthly(amount, rate, Math.max(1, term));
     if (amount > 0 && income > 0 && emiVal > income * 0.9) {
       fe.amount = t("err_emi_income");
@@ -220,7 +170,7 @@ export default function SurvivalScore() {
     }
 
     const inp: SurvInput = {
-      pkgIdx: pk,
+      pkgIdx: null,
       purpose: f.purpose,
       amount,
       term,
@@ -233,6 +183,7 @@ export default function SurvivalScore() {
       employment: f.employment,
       collateral: f.collateral,
       method: f.method as RepayMethod,
+      annualRate: rate,
     };
     const T = Math.max(6, Math.min(Math.round(inp.term || 60), 60));
     setRes({ mc: monteCarlo(inp, T, MC_PATHS), T, inp });
@@ -293,7 +244,6 @@ export default function SurvivalScore() {
                 <select
                   value={f.purpose}
                   onChange={(e) => {
-                    selectPkg(null);
                     set("purpose", e.target.value);
                   }}
                 >
@@ -304,33 +254,18 @@ export default function SurvivalScore() {
                   ))}
                 </select>
               </label>
-              <label className="fq">
-                <span>{t("q_package")}</span>
-                <select
-                  value={pkgSel ?? ""}
-                  onChange={(e) =>
-                    selectPkg(
-                      e.target.value === ""
-                        ? null
-                        : parseInt(e.target.value, 10),
-                    )
-                  }
-                >
-                  <option value="">{t("q_pkg_any")}</option>
-                  {pkgsForPurpose.map((p) => (
-                    <option key={p.idx} value={p.idx}>
-                      {bankOf(p.code).name} · {prodName(p, lang)}
-                    </option>
-                  ))}
-                </select>
+              <label className={`fq${fieldErrs.annualRate ? " fq-err" : ""}`}>
+                <span>{t("surv_rate")}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={f.annualRate}
+                  onChange={(e) => set("annualRate", e.target.value)}
+                  placeholder="Ví dụ: 8.5"
+                />
+                {fieldErrs.annualRate && <em className="field-err">⚠ {fieldErrs.annualRate}</em>}
               </label>
-              {activePkg && (
-                <div className="pkg-policy">
-                  {t("pkg_max")}: {(activePkg.max / 1e9).toFixed(1)}B VND ·{" "}
-                  {t("pkg_term")}: {activePkg.term} {t("r_mo")} · LTV:{" "}
-                  {activePkg.ltv}%
-                </div>
-              )}
               {numField("q_amount", "amount", 10000000)}
               {numField("q_term", "term", 6)}
               <label className="fq">
@@ -441,7 +376,7 @@ export default function SurvivalScore() {
 
           <div className="surv-result">
             {res ? (
-              <Result res={res} lang={lang} t={t} />
+              <Result res={res} t={t} />
             ) : (
               <div className="surv-empty">{t("surv_empty")}</div>
             )}
@@ -454,11 +389,9 @@ export default function SurvivalScore() {
 
 function Result({
   res,
-  lang,
   t,
 }: {
   res: { mc: MCResult; T: number; inp: SurvInput };
-  lang: Lang;
   t: (k: string) => string;
 }) {
   const { mc, T, inp } = res;
@@ -482,11 +415,6 @@ function Result({
     ["m_efr", met.efr.toFixed(1) + " " + t("r_mo"), "efr"],
     ["m_stab", met.stab + "/100", "stab"],
   ];
-  const selP = inp.pkgIdx != null ? PKG[inp.pkgIdx] : null;
-  const cheapest = PKG.filter((p) => p.purpose === inp.purpose).sort(
-    (a, b) => a.rate - b.rate,
-  )[0];
-  const bestP = selP || cheapest;
   const verdict = sc >= 70 ? t("v_yes") : sc >= 45 ? t("v_care") : t("v_no");
   const risks: string[] = [];
   if (met.dti > 45) risks.push(t("risk_dti"));
@@ -503,27 +431,8 @@ function Result({
         : t("adj_ok");
   const recos: [string, string][] = [
     [t("reco_borrow"), verdict],
-    [
-      t("reco_pkg"),
-      bestP ? bankOf(bestP.code).name + " · " + prodName(bestP, lang) : "—",
-    ],
+    [t("rate"), `${met.rate.toFixed(2)}%/${t("yr")} · ${t("surv_rate_source")}`],
   ];
-  if (
-    selP &&
-    cheapest &&
-    cheapest.code !== selP.code &&
-    cheapest.rate < selP.rate
-  ) {
-    recos.push([
-      t("reco_alt"),
-      bankOf(cheapest.code).name +
-        " · " +
-        prodName(cheapest, lang) +
-        " (" +
-        cheapest.rate +
-        "%)",
-    ]);
-  }
   recos.push(
     [t("reco_prob"), (mc.ruin * 100).toFixed(1) + "%"],
     [t("reco_risk"), risks.join(" · ")],
@@ -532,21 +441,6 @@ function Result({
 
   return (
     <>
-      {selP && (
-        <div className="surv-for">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc(selP.code)} alt="" />
-          <div>
-            <span>{t("surv_for")}</span>
-            <b>
-              {bankOf(selP.code).name} · {prodName(selP, lang)}
-            </b>
-          </div>
-          <span className="sf-rate">
-            {selP.rate}% → {selP.std}%
-          </span>
-        </div>
-      )}
       <div className={"score-head sc-" + vclass}>
         <div className="score-num">{sc}</div>
         <div className="score-meta">

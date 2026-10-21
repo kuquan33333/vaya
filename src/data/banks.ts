@@ -1,12 +1,9 @@
 // Loan-market data — ported from the source app.
 // PURP (purpose labels), BANKS (issuers), PKG (loan packages).
 //
-// NOTE ON `trend`: the source computed each package's 12-point trend with
-// Math.random() at module load. Under Next SSR that would produce different
-// values on the server vs. the client and trigger hydration mismatches on the
-// sparkline SVGs. We reproduce the exact same shape (a gently declining line
-// that lands on the package's headline rate) using a tiny seeded PRNG, so the
-// output is deterministic and identical on both server and client.
+// Legacy package records are retained as regression fixtures only. Their rate
+// and limit fields are not a public catalog and their historical trend is
+// intentionally empty until real D1 rate_history snapshots are available.
 
 import type { Lang } from "@/i18n/dict";
 
@@ -55,27 +52,6 @@ export function bankOf(code: string): Bank {
   );
 }
 
-// Deterministic PRNG (mulberry32-style) seeded from the package's base rate so
-// the generated trend is stable across renders. Mirrors the source's downward
-// drift (base + 1.8 at the start, easing down to `base` at the final point).
-function seededTrend(base: number): number[] {
-  let seed = (Math.floor(base * 1000) + 12345) >>> 0;
-  const rand = () => {
-    seed = (seed + 0x6d2b79f5) >>> 0;
-    let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-  const a: number[] = [];
-  let v = base + 1.8;
-  for (let i = 0; i < 12; i++) {
-    v -= rand() * 0.32;
-    a.push(+Math.max(base - 0.2, v).toFixed(2));
-  }
-  a[11] = base;
-  return a;
-}
-
 export type LoanPackage = {
   code: string;
   product: LocalizedString;
@@ -88,7 +64,7 @@ export type LoanPackage = {
   ltv: number;
   speed: LocalizedString;
   trend: number[];
-  change: number;
+  change: number | null;
 };
 
 type PackageSeed = Omit<LoanPackage, "trend" | "change">;
@@ -109,9 +85,5 @@ const PKG_SEED: PackageSeed[] = [
 ];
 
 export const PKG: LoanPackage[] = PKG_SEED.map((p) => {
-  const t = seededTrend(p.rate);
-  return { ...p, trend: t, change: +(t[11] - t[0]).toFixed(1) };
+  return { ...p, trend: [], change: null };
 });
-
-// 12-month average starting-rate series for the trend chart.
-export const AVG: number[] = [9.2, 9.0, 8.8, 8.6, 8.4, 8.1, 7.9, 7.8, 7.7, 7.6, 7.5, 7.4];

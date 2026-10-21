@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { T, type Lang } from "./dict";
 
-const STORAGE_KEY = "vaya_lang";
+const STORAGE_KEY = "vaytiendanang_lang";
 
 // Apply the persisted language before the browser paints, so a non-default
 // language never flashes English first on refresh. Falls back to useEffect on
@@ -36,17 +36,15 @@ function resolve(lang: Lang, key: string): string | string[] | undefined {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
-  // The app is held behind a tiny splash until the persisted language has been
-  // applied, so a non-default language never flashes English on first load or
-  // refresh. (<html lang> is also set by an inline script in layout.tsx so the
-  // correct font is used on the very first paint.)
-  const [ready, setReady] = useState(false);
-
-  // Hydrate persisted language before first paint (avoids default-language flash).
+  const [lang, setLangState] = useState<Lang>("vi");
+  // Keep the server-rendered application visible while the persisted language
+  // is restored. Gating the entire tree behind a client-only splash means a
+  // browser that cannot hydrate one module is left with an apparently blank
+  // page forever. The inline script in layout.tsx already sets <html lang>
+  // before paint; this effect only updates the React context.
   useIsoLayoutEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("vaya_lang");
       if (saved === "en" || saved === "vi" || saved === "zh") {
         setLangState(saved);
         document.documentElement.lang = saved;
@@ -54,7 +52,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore storage errors */
     }
-    setReady(true);
   }, []);
 
   const setLang = useCallback((l: Lang) => {
@@ -79,14 +76,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   return (
     <I18nContext.Provider value={{ lang, setLang, t, tRaw }}>
-      {ready ? (
-        children
-      ) : (
-        <div className="i18n-boot" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" width={44} height={44} />
-        </div>
-      )}
+      {children}
     </I18nContext.Provider>
   );
 }

@@ -1,0 +1,9 @@
+{
+  "name": "vaytiendanang-ingestor",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "beta",
+    "vite": "8.3.0"
+  }
+}

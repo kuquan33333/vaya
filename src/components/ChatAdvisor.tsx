@@ -6,7 +6,6 @@ import { useI18n } from "@/i18n/I18nProvider";
 import {
   PURP,
   PKG,
-  AVG,
   purpName,
   prodName,
   bankOf,
@@ -14,7 +13,6 @@ import {
   type Purpose,
 } from "@/data/banks";
 import {
-  recommend,
   fmtVND,
   fmtMonthly,
   termLabel,
@@ -40,6 +38,7 @@ import {
   type ConversationTurn,
 } from "@/lib/ai/offerContext";
 import { archiveConversation, loadConversation } from "@/lib/chatHistory";
+import type { SelectedLoanContext } from "@/lib/ai/prompts/conversationalAdvisor";
 
 /* ---------------------------------------------------------------- API types */
 
@@ -57,16 +56,37 @@ function renderMd(raw: string): string {
 
 interface ApiRankedOffer {
   packageId: string;
+  stableSlug?: string;
+  providerId?: string;
   bank: string;
+  productName?: string;
   score: number;
   monthlyPayment: number;
   dti: number;
   riskLevel: string;
+  ratePercent?: number;
+  rateBasis?: string;
+  maxAmount?: number | null;
+  maxTermMonths?: number | null;
+  sourceUrl?: string;
   breakdown: {
     lai_suat_thap: number;
     giai_ngan_nhanh: number;
     do_an_toan: number;
   };
+}
+
+function rateDisplay(rate: number | undefined, basis: string | undefined, lang: "en" | "vi" | "zh"): string {
+  if (rate == null) return "—";
+  if (basis === "monthly-flat") return `${rate}%/${lang === "vi" ? "tháng" : "month"} · ${lang === "vi" ? "dư nợ gốc" : "flat principal"}`;
+  return `${rate}%/${lang === "vi" ? "năm" : "year"}`;
+}
+
+function basisDisplay(basis: string | undefined, lang: "en" | "vi" | "zh"): string {
+  if (basis === "monthly-flat") return lang === "vi" ? "%/tháng · dư nợ gốc" : "%/month · original principal";
+  if (basis === "annual-nominal-original-principal") return lang === "vi" ? "%/năm · dư nợ gốc" : "%/year · original principal";
+  if (basis === "annual-nominal-reducing-balance") return lang === "vi" ? "%/năm · dư nợ giảm dần" : "%/year · reducing balance";
+  return basis ?? "unknown basis";
 }
 
 interface ApiRejectedOffer {
@@ -97,6 +117,7 @@ function makeSessionId(): string {
 }
 
 const CHAT_LS_KEY = "vaya_chat_session";
+const CHAT_DRAFT_KEY = "vaytiendanang_chat_draft";
 
 /** Cap on transcript messages sent to the server — mirrors the server's own bound. */
 const TRANSCRIPT_MAX_MESSAGES = 20;
@@ -199,6 +220,8 @@ type ApiResultData = {
   amount: number;
   term: number;
   income: number;
+  catalogReady?: boolean;
+  catalogMessage?: string;
   explanation?: string;
 };
 
@@ -316,12 +339,16 @@ export default function ChatAdvisor({
   offerId,
   postId,
   restoreId,
+  embedded = false,
+  loanContext,
 }: {
   seed?: string;
   pkg?: number;
   offerId?: string;
   postId?: string;
   restoreId?: string;
+  embedded?: boolean;
+  loanContext?: SelectedLoanContext;
 }) {
   const router = useRouter();
   const { lang, t, tRaw } = useI18n();
@@ -338,9 +365,13 @@ export default function ChatAdvisor({
     amount: null,
     term: null,
     age: null,
+    income: null,
   });
   // Package-advisor mode: when set, the conversation is about this product only.
-  const pkgRef = useRef<number | null>(pkg != null && PKG[pkg] ? pkg : null);
+  // Legacy package-mode code remains in the component for regression support,
+  // but is not a public entry point: package records are static fixtures and
+  // must never be presented as current offers.
+  const pkgRef = useRef<number | null>(null);
   const pkgAns = useRef<{
     amount: number | null;
     term: number | null;
@@ -358,6 +389,9 @@ export default function ChatAdvisor({
   const offerHistoryRef = useRef<ConversationTurn[]>([]);
   // Set while the affordability flow waits for the borrower to type their income.
   const awaitingIncomeRef = useRef(false);
+  const sendToApiChatRef = useRef<
+    ((txt: string, offerCtx?: OfferDiscussionContext, affordability?: AffordabilityInputs) => Promise<void>) | null
+  >(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const idRef = useRef(0);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -415,12 +449,6 @@ export default function ChatAdvisor({
   tRef.current = t;
   langRef.current = lang;
   tRawRef.current = tRaw;
-
-  // Read the localized `ages` array (t() only yields strings; ages is string[]).
-  const ageLabels = (): string[] => {
-    const raw = tRawRef.current("ages");
-    return Array.isArray(raw) ? raw : [];
-  };
 
   const nextId = () => ++idRef.current;
 
@@ -675,7 +703,6 @@ export default function ChatAdvisor({
         },
       ]),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addBot, addUser, clearChips, setChips, finishPkg]);
 
   const askTermPkg = useCallback(() => {
@@ -706,7 +733,6 @@ export default function ChatAdvisor({
         },
       ]),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addBot, addUser, clearChips, setChips, askIncomePkg]);
 
   const askAmountPkg = useCallback(() => {
@@ -744,7 +770,6 @@ export default function ChatAdvisor({
           },
         ]),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addBot, addUser, clearChips, setChips, askTermPkg]);
 
   const startPkgChat = useCallback(
@@ -764,6 +789,7 @@ export default function ChatAdvisor({
         amount: null,
         term: null,
         age: null,
+        income: null,
       };
       addBot(
         tRef
@@ -774,7 +800,6 @@ export default function ChatAdvisor({
         () => askAmountPkg(),
       );
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [addBot, rerender, askAmountPkg],
   );
 
@@ -823,14 +848,6 @@ export default function ChatAdvisor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-
-  const ageChips = useCallback((): Chip[] => {
-    return ageLabels().map((l, i) => ({
-      label: l,
-      action: () => pickAge([23, 30, 42, 55][i]),
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const askInput = useCallback(
     (q: string) => {
@@ -882,14 +899,28 @@ export default function ChatAdvisor({
           },
         ]),
       );
-    } else if (s.age == null) {
-      s.step = "age";
-      addBot(T("ask_age"), () => setChips(ageChips()));
+    } else if (s.income == null) {
+      s.step = "income";
+      addBot(T("q_income"), () =>
+        setChips([
+          ...[20e6, 35e6, 50e6, 80e6].map((income) => ({
+            label: fmtVND(income, L),
+            action: () => pickIncome(income),
+          })),
+          {
+            label: T("other"),
+            action: () => {
+              stateRef.current.step = "income_free";
+              askInput(T("q_income"));
+            },
+          },
+        ]),
+      );
     } else {
       finish();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addBot, askInput, setChips, purposeChips, ageChips]);
+  }, [addBot, askInput, setChips, purposeChips]);
 
   const pickPurpose = (k: Purpose) => {
     addUser(purpName(k, langRef.current));
@@ -909,12 +940,11 @@ export default function ChatAdvisor({
     clearChips();
     advance();
   };
-  const pickAge = (a: number) => {
-    const labels = ageLabels();
-    addUser(labels[a < 25 ? 0 : a < 36 ? 1 : a < 51 ? 2 : 3]);
-    stateRef.current.age = a;
+  const pickIncome = (income: number) => {
+    addUser(fmtVND(income, langRef.current));
+    stateRef.current.income = income;
     clearChips();
-    finish();
+    advance();
   };
 
   const handleFree = (txt: string) => {
@@ -952,15 +982,15 @@ export default function ChatAdvisor({
       }
       stateRef.current.term = m;
       advance();
-    } else if (st === "age") {
-      const match = txt.match(/\d+/);
+    } else if (st === "income_free" || st === "income") {
+      const match = txt.match(/[\d.]+/);
       const n = match ? parseInt(match[0]) : NaN;
       if (!n) {
-        addBot(T("ask_age"));
+        addBot(T("q_income"));
         return;
       }
-      stateRef.current.age = n;
-      finish();
+      stateRef.current.income = n >= 1_000_000 ? n : n * 1_000_000;
+      advance();
     } else {
       handleFree(txt);
     }
@@ -972,30 +1002,46 @@ export default function ChatAdvisor({
     const T = tRef.current;
     addBot(T("analyzing"), () => {
       const s = stateRef.current;
-      // Always use local Decision Engine for consistent ResultCard UI
-      const recs = recommend(s);
-      addBotResult(
-        {
-          purpose: s.purpose as Purpose,
-          amount: s.amount as number,
-          term: s.term as number,
-          recs,
-        },
-        () => {
-          const chipTimer = setTimeout(() => {
-            setChips([
-              {
-                label: tRef.current("restart"),
-                action: () => startChat(),
-              },
-            ]);
-          }, 400);
-          timersRef.current.push(chipTimer);
-        },
-      );
+      void (async () => {
+        try {
+          const response = await fetch("/api/calculate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              muc_dich: PURPOSE_TO_MUC_DICH[s.purpose as Purpose],
+              so_tien: s.amount,
+              thoi_han_thang: s.term,
+              thu_nhap_hang_thang: s.income,
+              no_hien_tai_hang_thang: 0,
+              uu_tien: [],
+            }),
+          });
+          const data = (await response.json()) as {
+            ranked?: ApiRankedOffer[];
+            rejected?: ApiRejectedOffer[];
+            catalogReady?: boolean;
+            message?: string | null;
+          };
+          if (!response.ok) throw new Error("calculate_failed");
+          addBotApiResult(
+            {
+              ranked: data.ranked ?? [],
+              rejected: data.rejected ?? [],
+              amount: s.amount ?? 0,
+              term: s.term ?? 0,
+              income: s.income ?? 0,
+              catalogReady: data.catalogReady,
+              catalogMessage: data.message ?? undefined,
+            },
+            () => setChips([{ label: tRef.current("restart"), action: () => startChat() }]),
+          );
+        } catch {
+          addBot(tRef.current("chat_err"));
+        }
+      })();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addBot, addBotResult, clearChips, setChips]);
+  }, [addBot, addBotApiResult, clearChips, setChips]);
 
   /** Build the structured, localized offer context sent to /api/chat. */
   const buildOfferContext = (
@@ -1035,28 +1081,29 @@ export default function ChatAdvisor({
   };
 
   /** CTA chip: stress-test the priced deal in the survival score. */
-  const survivalChip = (v: AffordabilityVerdict): Chip => ({
+  const survivalChip = useCallback((v: AffordabilityVerdict): Chip => ({
     label: tRef.current("mk_run_survival"),
     action: () =>
       router.push(
         `/survival?a=${v.amount}&t=${v.termMonths}&i=${v.income}&r=${v.rate}`,
       ),
-  });
+  }), [router]);
 
-  const sendAffordability = (income: number, debt: number) => {
+  const sendAffordability = useCallback((income: number, debt: number) => {
     awaitingIncomeRef.current = false;
     const oc = offerRef.current;
-    if (!oc) return;
+    const send = sendToApiChatRef.current;
+    if (!oc || !send) return;
     const inputs: AffordabilityInputs = { income, debt };
-    sendToApiChat(
+    void send(
       tRef.current("mk_afford_chip"),
       buildOfferContext(oc.offer, oc.post),
       inputs,
     );
-  };
+  }, []);
 
   /** Kick off the check: saved income goes straight to the engine, else ask once. */
-  const startAffordability = () => {
+  const startAffordability = useCallback(() => {
     clearChips();
     addUser(tRef.current("mk_afford_chip"));
     const saved = readSavedAffordability();
@@ -1066,18 +1113,7 @@ export default function ChatAdvisor({
       awaitingIncomeRef.current = true;
       addBot(tRef.current("mk_ask_income"), () => inputRef.current?.focus());
     }
-  };
-
-  const affordChip = (): Chip => ({
-    label: tRef.current("mk_afford_chip"),
-    action: () => startAffordability(),
-  });
-
-  /** Re-run chip shown after a verdict — same flow, distinct label. */
-  const retryChip = (): Chip => ({
-    label: tRef.current("mk_afford_retry"),
-    action: () => startAffordability(),
-  });
+  }, [addBot, addUser, clearChips, sendAffordability]);
 
   /** Auto-title for the history index: offer bank · purpose, else the first
    *  user message (truncated), else the purpose name. */
@@ -1143,11 +1179,14 @@ export default function ChatAdvisor({
         .replace("{term}", termLabel(offer.termMonths, T))
         .replace("{conditions}", offer.conditions.map((c) => T(c)).join(" · "));
       addBot(greet, () => {
-        setChips([affordChip()]);
+        setChips([{
+          label: tRef.current("mk_afford_chip"),
+          action: () => startAffordability(),
+        }]);
         inputRef.current?.focus();
       });
     },
-    [addBot, rerender, setChips, archiveCurrent],
+    [addBot, rerender, setChips, archiveCurrent, startAffordability],
   );
 
   const startChat = useCallback(
@@ -1167,6 +1206,7 @@ export default function ChatAdvisor({
         amount: null,
         term: null,
         age: null,
+        income: null,
       };
       const T = tRef.current;
       addBot(T("greet"), () => {
@@ -1190,6 +1230,12 @@ export default function ChatAdvisor({
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
+    try {
+      const draft = localStorage.getItem(CHAT_DRAFT_KEY);
+      if (draft && inputRef.current) inputRef.current.value = draft;
+    } catch {
+      /* noop */
+    }
 
     // Restore an archived conversation from the history index (?restore=<id>).
     // The history panel links here; the snapshot reproduces the exact talk and,
@@ -1203,7 +1249,7 @@ export default function ChatAdvisor({
           m.role === "bot" ? { ...m, typing: false } : m,
         );
         stateRef.current = snap.state;
-        pkgRef.current = snap.pkg;
+        pkgRef.current = null;
         pkgAns.current = snap.pkgAns;
         idRef.current = snap.idCounter;
         profileRef.current = snap.profile ?? {};
@@ -1253,18 +1299,17 @@ export default function ChatAdvisor({
     }
 
     if (!booted) {
-      const hasNewIntent =
-        seed != null || pkg != null || offerId != null || restoreId != null;
+      const hasNewIntent = seed != null || offerId != null || restoreId != null || loanContext != null;
       const saved = !hasNewIntent ? loadChat() : null;
       // Only restore a saved wizard conversation (saved.offer == null); a saved
       // offer discussion is incompatible with this entry point, so start fresh.
-      if (saved && saved.messages.length > 0 && saved.offer == null) {
+      if (saved && saved.pkg == null && saved.messages.length > 0 && saved.offer == null) {
         // Restore persisted session (user navigated back without a new intent)
         messagesRef.current = saved.messages.map((m) =>
           m.role === "bot" ? { ...m, typing: false } : m,
         );
         stateRef.current = saved.state;
-        pkgRef.current = saved.pkg;
+        pkgRef.current = null;
         pkgAns.current = saved.pkgAns;
         idRef.current = saved.idCounter;
         profileRef.current = saved.profile ?? {};
@@ -1338,6 +1383,7 @@ export default function ChatAdvisor({
                   profile: profileRef.current,
                   messages: toTranscript(messagesRef.current),
                 }),
+            ...(loanContext ? { loanContext } : {}),
             ...(affordability ? { affordability } : {}),
           }),
         });
@@ -1421,6 +1467,8 @@ export default function ChatAdvisor({
                     s.term ??
                     60) as number,
                   income: payload.profile?.thu_nhap_hang_thang ?? 0,
+                  catalogReady: payload.catalogReady,
+                  catalogMessage: payload.catalogMessage,
                 });
               } else if (
                 currentEvent === "affordability" &&
@@ -1431,7 +1479,13 @@ export default function ChatAdvisor({
                 const v = payload as AffordabilityVerdict;
                 dropPending();
                 addBot(renderVerdict(v));
-                setChips([survivalChip(v), retryChip()]);
+                setChips([
+                  survivalChip(v),
+                  {
+                    label: tRef.current("mk_afford_retry"),
+                    action: () => startAffordability(),
+                  },
+                ]);
               } else if (currentEvent === "explanation" && payload.delta) {
                 // The narration stream itself is the reveal — drop the placeholder.
                 dropPending();
@@ -1486,8 +1540,10 @@ export default function ChatAdvisor({
         addBot(tRef.current("chat_err"));
       }
     },
-    [addBot, addBotForm, addBotApiResult, dropMessage, setChips],
+    [addBot, addBotForm, addBotApiResult, dropMessage, loanContext, rerender, scrollChat, setChips, startAffordability, survivalChip],
   );
+
+  sendToApiChatRef.current = sendToApiChat;
 
   const sendCurrent = () => {
     const i = inputRef.current;
@@ -1495,6 +1551,11 @@ export default function ChatAdvisor({
     const v = i.value.trim();
     if (!v) return;
     i.value = "";
+    try {
+      localStorage.removeItem(CHAT_DRAFT_KEY);
+    } catch {
+      /* noop */
+    }
 
     // Offer-discussion mode: every message goes to the offer-scoped AI talk.
     const oc = offerRef.current;
@@ -1529,14 +1590,15 @@ export default function ChatAdvisor({
   /* ---- render ---- */
 
   return (
-    <section id="chatView" className="on">
+    <section id="chatView" className={embedded ? "on chat-embedded" : "on"}>
       <div className="chat-shell">
-        <div className="chat-head">
+        <div className={"chat-head" + (embedded ? " chat-head-embedded" : "")}>
           <div className="av">
-            <img className="avimg" src="/mascot/vaya-avatar.png" alt="Vaya" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="avimg" src="/mascot/vaya-avatar.png" alt="vaytiendanang" />
           </div>
           <div className="who">
-            <b>Vaya</b>
+            <b>vaytiendanang</b>
             <span className="on-ind">{t("advisor_sub")}</span>
           </div>
           <div className="hact">
@@ -1559,6 +1621,11 @@ export default function ChatAdvisor({
                 pkgRef.current = null;
                 offerRef.current = null;
                 awaitingIncomeRef.current = false;
+                try {
+                  localStorage.removeItem(CHAT_DRAFT_KEY);
+                } catch {
+                  /* noop */
+                }
                 startChat();
               }}
             >
@@ -1582,10 +1649,11 @@ export default function ChatAdvisor({
             ) : (
               <div className="msg bot" key={m.id}>
                 <div className="mav">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     className="avimg"
                     src="/mascot/vaya-avatar.png"
-                    alt="Vaya"
+                    alt="vaytiendanang"
                   />
                 </div>
                 {m.typing ? (
@@ -1659,6 +1727,13 @@ export default function ChatAdvisor({
             ref={inputRef}
             placeholder={t("chat_ph")}
             autoComplete="off"
+            onChange={(e) => {
+              try {
+                localStorage.setItem(CHAT_DRAFT_KEY, e.currentTarget.value);
+              } catch {
+                /* noop */
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") sendCurrent();
             }}
@@ -1693,7 +1768,7 @@ function buildReport(
   t: (k: string) => string,
 ): ReportData {
   return {
-    brand: "Vaya",
+    brand: "vaytiendanang",
     title: t("rep_title"),
     subtitle: t("rep_sub"),
     generatedLabel: t("rep_generated"),
@@ -1903,7 +1978,7 @@ function ResultCard({
                   lang,
                   t,
                 ),
-                `vaya-report-${purpose}-${new Date().toISOString().slice(0, 10)}.html`,
+                `vaytiendanang-report-${purpose}-${new Date().toISOString().slice(0, 10)}.html`,
               )
             }
           >
@@ -1945,6 +2020,18 @@ function ApiResultCard({
   const { ranked, rejected, amount, term } = data;
 
   if (ranked.length === 0) {
+    if (data.catalogReady === false) {
+      return (
+        <div className="result api-result">
+          <div className="rh">{t("catalog_not_ready")}</div>
+          <p className="api-catalog-message">
+            {data.catalogMessage ?? t("catalog_not_ready_detail")}
+          </p>
+          <button className="btn btn-green btn-sm" onClick={() => router.push("/register?source=ai")}>{t("catalog_lead_cta")}</button>
+          <div className="foot">{t("foot_note")}</div>
+        </div>
+      );
+    }
     const rec = data.recovery;
     return (
       <div className="result api-result">
@@ -2009,10 +2096,19 @@ function ApiResultCard({
     );
   }
 
-  const top = ranked.slice(0, 3);
-  const bestPayment = top[0].monthlyPayment;
-  const worstPayment = top[top.length - 1].monthlyPayment;
-  const savingsTotal = Math.round((worstPayment - bestPayment) * term);
+  const groups = Array.from(
+    ranked.reduce((map, offer) => {
+      const current = map.get(offer.rateBasis) ?? [];
+      current.push(offer);
+      map.set(offer.rateBasis, current);
+      return map;
+    }, new Map<string | undefined, ApiRankedOffer[]>()),
+  );
+  const comparableTop = groups.length === 1 ? groups[0][1].slice(0, 3) : [];
+  const leading = groups[0]?.[1][0];
+  const savingsTotal = comparableTop.length >= 2
+    ? Math.round((comparableTop[comparableTop.length - 1].monthlyPayment - comparableTop[0].monthlyPayment) * term)
+    : 0;
 
   return (
     <div className="result api-result">
@@ -2020,8 +2116,9 @@ function ApiResultCard({
 
       {/* Bank cards */}
       <div className="api-cards">
-        {top.map((r, i) => {
-          const pkg = LOAN_PACKAGES.find((p) => p.id === r.packageId);
+        {groups.map(([basis, offers]) => <React.Fragment key={basis ?? "unknown"}>
+          <div className="api-basis-label">{t("rate_basis_group").replace("{basis}", basisDisplay(basis, lang))}</div>
+          {offers.slice(0, 3).map((r, i) => {
           const best = i === 0;
           const match = Math.min(99, Math.max(50, Math.round(r.score)));
           return (
@@ -2035,18 +2132,18 @@ function ApiResultCard({
                   : `${t("fit")} · ${match}%`}
               </div>
               <div className="api-bank">{r.bank}</div>
-              <div className="api-prod">{r.packageId}</div>
+              <div className="api-prod">{r.productName ?? r.packageId}</div>
               <div className="api-metrics">
                 <div className="api-m">
                   <span className="api-mk">{t("api_loan_range")}</span>
                   <span className="api-mv">
-                    {pkg ? fmtVND(pkg.han_muc, lang) : "—"}
+                    {r.maxAmount != null ? fmtVND(r.maxAmount, lang) : "—"}
                   </span>
                 </div>
                 <div className="api-m">
                   <span className="api-mk">{t("rate")}</span>
                   <span className="api-mv">
-                    {pkg ? pkg.lai_suat_tu + "%/" + t("yr") : "—"}
+                    {rateDisplay(r.ratePercent, r.rateBasis, lang)}
                   </span>
                 </div>
                 <div className="api-m">
@@ -2058,80 +2155,59 @@ function ApiResultCard({
                 className="btn btn-ghost btn-sm api-detail-btn"
                 onClick={() =>
                   router.push(
-                    `/survival?a=${amount}&t=${term}&i=${data.income}&bank=${encodeURIComponent(top[0].bank)}`,
+                    r.stableSlug
+                      ? `/product/${r.stableSlug}`
+                      : `/survival?a=${amount}&t=${term}&i=${data.income}&r=${r.ratePercent ?? ""}`,
                   )
                 }
               >
                 {t("api_view_detail")} →
               </button>
+              <button
+                className="btn btn-green btn-sm api-detail-btn"
+                onClick={() => router.push(`/register?source=ai&productId=${encodeURIComponent(r.packageId)}${r.providerId ? `&providerId=${encodeURIComponent(r.providerId)}` : ""}`)}
+              >
+                {t("api_apply_product")}
+              </button>
             </div>
           );
-        })}
+          })}
+        </React.Fragment>)}
       </div>
 
       {/* Savings banner */}
-      {savingsTotal > 0 && top.length >= 2 && (
+      {savingsTotal > 0 && comparableTop.length >= 2 && (
         <div className="api-savings">
           {t("api_savings")
             .replace("{save}", fmtMonthly(savingsTotal))
             .replace("{term}", String(term))}
         </div>
       )}
+      {groups.length > 1 && <div className="foot">{t("rate_basis_disclosure")}</div>}
 
       {/* Benefit / warning boxes */}
       <div className="api-boxes">
         {(() => {
-          const bestPkg = LOAN_PACKAGES.find((p) => p.id === top[0].packageId);
-          if (!bestPkg) return null;
           const boxes: {
             icon: string;
             title: string;
             desc: string;
             warn: boolean;
           }[] = [];
-          if (bestPkg.fast_approval)
-            boxes.push({
-              icon: "⚡",
-              title: t("api_b_fast"),
-              desc: t("api_b_fast_d"),
-              warn: false,
-            });
-          if (bestPkg.online_application)
-            boxes.push({
-              icon: "🌐",
-              title: t("api_b_online"),
-              desc: t("api_b_online_d"),
-              warn: false,
-            });
-          if (bestPkg.ekyc)
-            boxes.push({
-              icon: "🔒",
-              title: t("api_b_ekyc"),
-              desc: t("api_b_ekyc_d"),
-              warn: false,
-            });
-          if (bestPkg.no_cic_required)
-            boxes.push({
-              icon: "📋",
-              title: t("api_b_nocic"),
-              desc: t("api_b_nocic_d"),
-              warn: false,
-            });
-          // Always show interest calculation method
           boxes.push({
             icon: "📊",
             title: t("api_b_calc"),
-            desc: t("api_b_calc_d"),
+            desc: leading?.rateBasis ?? t("api_b_calc_d"),
             warn: false,
           });
           // DTI warning if high
-          if (top[0].dti > 0.35)
+          if ((leading?.dti ?? 0) > 0.35)
             boxes.push({
               icon: "⚠️",
               title: t("api_w_dti"),
               desc: t("api_w_dti_d").replace(
                 "{dti}",
-                Math.round(top[0].dti * 100) + "%",
+                Math.round((leading?.dti ?? 0) * 100) + "%",
               ),
               warn: true,
             });
@@ -2322,18 +2398,12 @@ function PkgResultCard({
       : vclass === "ok"
         ? t("pk_v_ok")
         : t("pk_v_bad");
-  const mktAvg = AVG[AVG.length - 1];
-  const delta = p.rate - mktAvg;
   const facts: [string, string][] = [
     [t("pk_emi"), fmtMonthly(a.emi)],
     [t("pk_promo"), fmtMonthly(promoEmi)],
     [t("pk_interest"), fmtMonthly(a.interest)],
     [t("pk_total"), fmtMonthly(amt + a.interest)],
     [t("m_dti"), dti.toFixed(0) + "%"],
-    [
-      t("pk_vs"),
-      (delta <= 0 ? "▼ " : "▲ ") + Math.abs(delta).toFixed(1) + " pts",
-    ],
   ];
   const checks: [boolean, string][] = [
     [okAmt, t("pk_c_amount")],
@@ -2414,7 +2484,7 @@ function PkgResultCard({
                   },
                 ],
               },
-              `vaya-report-${p.code}-${new Date().toISOString().slice(0, 10)}.html`,
+              `vaytiendanang-report-${p.code}-${new Date().toISOString().slice(0, 10)}.html`,
             )
           }
         >

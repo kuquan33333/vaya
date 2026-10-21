@@ -1,9 +1,8 @@
-import fs from "node:fs";
-import path from "node:path";
-
 /* ================================================================
-   Policy chunk store — flat in-memory array.
-   No vector DB needed at this scale (a handful of docs).
+   Policy chunk store.
+   The in-memory array remains a small unit-test/legacy adapter. Production
+   requests read only reviewer-approved chunks from D1 because a Worker
+   isolate is not durable and must not depend on local filesystem state.
    ================================================================ */
 
 export interface PolicyChunk {
@@ -15,10 +14,21 @@ export interface PolicyChunk {
   embedding: number[];
 }
 
-const chunks: PolicyChunk[] = [];
+export interface PolicyChunkDatabase {
+  prepare(query: string): {
+    all<T>(): Promise<{ results: T[] }>;
+  };
+}
 
-const STORE_DIR = path.join(process.cwd(), "src", "data", "rag");
-const STORE_FILE = path.join(STORE_DIR, "chunks.json");
+interface PolicyChunkRow {
+  chunk_id: string;
+  bank: string;
+  section: string;
+  text: string;
+  embedding_json: string;
+}
+
+const chunks: PolicyChunk[] = [];
 
 export function addChunk(chunk: PolicyChunk): void {
   chunks.push(chunk);
@@ -28,31 +38,55 @@ export function getAllChunks(): PolicyChunk[] {
   return chunks;
 }
 
+function parseEmbedding(value: string): number[] | null {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 4096) return null;
+    const embedding = parsed.filter((item): item is number => typeof item === "number" && Number.isFinite(item));
+    return embedding.length === parsed.length ? embedding : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Read only source-backed, reviewer-approved chunks from canonical D1. */
+export async function getPolicyChunks(db?: PolicyChunkDatabase): Promise<PolicyChunk[]> {
+  if (!db) return getAllChunks();
+  try {
+    const rows = await db.prepare(
+      `SELECT chunk_id, bank, section, text, embedding_json
+       FROM policy_chunks
+       WHERE status = 'verified'
+       ORDER BY observed_at DESC
+       LIMIT 5000`,
+    ).all<PolicyChunkRow>();
+    return rows.results.flatMap((row) => {
+      const embedding = parseEmbedding(row.embedding_json);
+      if (!embedding || !row.text.trim() || !row.bank.trim() || !row.section.trim()) return [];
+      return [{
+        id: row.chunk_id,
+        bank: row.bank,
+        section: row.section,
+        text: row.text.slice(0, 12_000),
+        embedding,
+      }];
+    });
+  } catch {
+    // A missing/unmigrated table fails closed: no RAG context is safer than
+    // silently falling back to stale or bundled policy text.
+    return [];
+  }
+}
+
 export function clearStore(): void {
   chunks.length = 0;
 }
 
 /**
- * Persist the in-memory store to disk as JSON.
- * Used after ingestion to avoid re-embedding on every boot.
+ * Compatibility no-op retained for the original ingestion API. Callers must
+ * persist the source/embedding in D1 rather than process-local memory.
  */
-export function saveStore(): void {
-  fs.mkdirSync(STORE_DIR, { recursive: true });
-  fs.writeFileSync(STORE_FILE, JSON.stringify(chunks, null, 2), "utf-8");
-}
+export function saveStore(): void {}
 
-/**
- * Load pre-embedded chunks from disk if the file exists.
- * Called at module boot to hydrate the in-memory store.
- */
-export function loadStore(): void {
-  if (fs.existsSync(STORE_FILE)) {
-    const data = fs.readFileSync(STORE_FILE, "utf-8");
-    const parsed: PolicyChunk[] = JSON.parse(data);
-    chunks.length = 0;
-    chunks.push(...parsed);
-  }
-}
-
-// Hydrate at boot — safe no-op if file doesn't exist yet.
-loadStore();
+/** Compatibility no-op; Workers cannot rely on a writable local filesystem. */
+export function loadStore(): void {}

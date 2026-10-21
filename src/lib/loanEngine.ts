@@ -16,6 +16,7 @@ export type ChatState = {
   amount: number | null;
   term: number | null; // months
   age: number | null;
+  income?: number | null;
 };
 
 /** A scored recommendation (a LoanPackage plus computed fields). */

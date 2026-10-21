@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import Hero from "@/components/Hero";
-import MarketsSection from "@/components/MarketsSection";
+import { useEffect, useState } from "react";
+import VerifiedPromoCarousel from "@/components/VerifiedPromoCarousel";
+import VerifiedMarketsSection from "@/components/VerifiedMarketsSection";
+import LoanEstimator from "@/components/LoanEstimator";
 import PurposePicker from "@/components/PurposePicker";
 import WhySection from "@/components/WhySection";
 import HowSection from "@/components/HowSection";
@@ -15,10 +16,18 @@ import Footer from "@/components/Footer";
 import RateFlow from "@/components/RateFlow";
 import FooterReveal from "@/components/FooterReveal";
 import { useI18n } from "@/i18n/I18nProvider";
-import { BANKS } from "@/data/banks";
+import type { CatalogFilter } from "@/components/VerifiedMarketsSection";
+import type { Purpose } from "@/data/banks";
 
 export default function Home() {
   const { t } = useI18n();
+  const [catalogFilter, setCatalogFilter] = useState<CatalogFilter>("all");
+
+  const focusCatalog = (purpose: Purpose) => {
+    const filter: CatalogFilter = purpose === "personal" ? "unsecured" : purpose;
+    setCatalogFilter(filter);
+    requestAnimationFrame(() => document.getElementById("markets")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   // Reveal-on-scroll (IntersectionObserver) — ported from the source's global
   // observer. Observes every `.reveal:not(.in)` element after mount.
@@ -37,25 +46,6 @@ export default function Home() {
     return () => io.disconnect();
   }, []);
 
-  // Trust marquee — JS transform ticker (rAF). Replaces the CSS keyframe
-  // animation so it always scrolls (not gated by prefers-reduced-motion) and
-  // loops seamlessly at the halfway point of the duplicated band.
-  useEffect(() => {
-    const el = document.getElementById("mq");
-    if (!el) return;
-    let raf = 0;
-    let x = 0;
-    const step = () => {
-      const half = el.scrollWidth / 2;
-      x -= 0.4;
-      if (half > 0 && -x >= half) x += half;
-      el.style.transform = `translateX(${x.toFixed(1)}px)`;
-      raf = requestAnimationFrame(step);
-    };
-    step();
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
   // Smooth-scroll to a section when arriving with a hash (e.g. from /#markets).
   useEffect(() => {
     const id = window.location.hash.replace("#", "");
@@ -71,23 +61,18 @@ export default function Home() {
     <main id="homeView">
       {/* Opaque column that slides away to uncover the pinned footer. */}
       <div className="page-above">
-        <Hero />
+        {/* Banner/registration first; the full AI experience lives in FloatingAdvisor and /chat. */}
+        <VerifiedPromoCarousel />
 
         <section className="trust">
           <div className="lab">{t("trust")}</div>
-          <div className="mq" id="mq">
-            {[...Array(10)].flatMap(() => BANKS).map((b, i) => (
-              <span key={i}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="mqlogo" src={`/banks/${b.code}.png`} alt={b.name} title={b.name} />
-              </span>
-            ))}
-          </div>
+          <p className="trust-note">{t("trust_note")}</p>
         </section>
 
-        <PurposePicker />
+        <PurposePicker onPurposeSelect={focusCatalog} />
 
-        <MarketsSection />
+        <VerifiedMarketsSection selectedFilter={catalogFilter} onFilterChange={setCatalogFilter} />
+        <LoanEstimator />
         <WhySection />
         <HowSection />
         <Manifesto />

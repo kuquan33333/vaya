@@ -1,7 +1,7 @@
-// Front-end mock of the Survival-Score finance engine. The real BE/AI pipeline
-// (feature engineering → cash-flow engine → Monte-Carlo → risk scoring → LLM)
-// is owned by the backend teammate; this mirrors it client-side so the UI is
-// fully interactive and ready to swap for the API.
+// Deterministic client-side Survival-Score engine. It keeps the original
+// cash-flow, Monte-Carlo and stress-test behavior available in the browser;
+// product-specific rates are accepted only from a verified product or an
+// explicitly user-entered scenario.
 import { PKG } from "@/data/banks";
 import { monthly } from "@/lib/loanEngine";
 
@@ -32,6 +32,8 @@ export type SurvInput = {
   employment: string;
   collateral: string;
   method?: RepayMethod;
+  /** Annual rate supplied by a verified product or explicitly entered by the user. */
+  annualRate?: number | null;
 };
 
 export type SurvMetrics = {
@@ -59,10 +61,10 @@ export type MCResult = {
 };
 
 export function pickRate(purpose: string): { rate: number; std: number } {
-  const ps = PKG.filter((p) => p.purpose === purpose);
-  if (!ps.length) return { rate: 12, std: 14 };
-  const best = ps.reduce((a, b) => (b.rate < a.rate ? b : a));
-  return { rate: best.rate, std: best.std };
+  // Kept as a compatibility API for older callers. A purpose alone is not a
+  // rate source; callers must provide an explicit rate or package index.
+  void purpose;
+  return { rate: 0, std: 0 };
 }
 
 /** Deterministic seeded PRNG (mulberry32) — same inputs always produce same chart. */
@@ -105,9 +107,10 @@ export function computeMetrics(inp: SurvInput): SurvMetrics {
   if (inp.pkgIdx != null && PKG[inp.pkgIdx]) {
     const sp = PKG[inp.pkgIdx];
     rate = sp.std || sp.rate;
+  } else if (inp.annualRate != null && Number.isFinite(inp.annualRate) && inp.annualRate >= 0) {
+    rate = inp.annualRate;
   } else {
-    const pr = pickRate(inp.purpose);
-    rate = pr.std || pr.rate || 12;
+    rate = 0;
   }
   const n = Math.max(1, inp.term || 1);
   const r = rate / 100 / 12;

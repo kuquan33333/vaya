@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Lang } from "@/i18n/dict";
 import { computeSurvivability } from "@/lib/engine/survivability";
-import { getAllProducts } from "@/data/products";
 import { SHOCK_DEFINITIONS } from "@/lib/engine/shocks";
 import { BASE_RATE_SCENARIOS } from "@/lib/engine/scenarios";
 import {
@@ -20,6 +19,7 @@ import type {
   AmortizationMethod,
   GraceConfig,
   HouseholdInput,
+  LoanProduct,
   SurvivabilityReport,
 } from "@/lib/engine/types";
 
@@ -34,6 +34,61 @@ const GROUPED = (s: string) => {
   const d = DIGITS(s);
   return d ? Number(d).toLocaleString("en-US") : "";
 };
+
+function manualStressProduct(annualRate: number): LoanProduct {
+  const rateBps = Math.round(annualRate * 100);
+  return {
+    productId: "user-entered-stress-scenario",
+    bankId: "user-input",
+    bankName: "Giả định người dùng nhập",
+    purpose: "HOME",
+    promoMonths: 0,
+    promoRateBps: rateBps,
+    floatingMarginBps: 0,
+    promoTiers: [{ promoMonths: 0, promoRateBps: rateBps, floatingMarginBps: 0, conditions: [], requiresInsurance: false }],
+    baseRate: { kind: "PUBLISHED_BASE_RATE" },
+    currentBaseRateBps: rateBps,
+    floorRateBps: 0,
+    rateResetIntervalMonths: 6,
+    maxTermMonths: 480,
+    maxLtvBps: 10000,
+    maxDtiBps: 6000,
+    minMonthlyIncomeVnd: 0,
+    maxAgeAtMaturity: 100,
+    minAgeAtApplication: 18,
+    prepaymentFeeTiers: [],
+    promoClawback: { applies: false, description: "Không áp dụng trong mô phỏng." },
+    upfrontFees: { appraisalFeeVnd: 0, insuranceMandatory: false },
+    acceptedIncomeProofs: [
+      "PAYROLL_TRANSFER",
+      "PAYROLL_CASH",
+      "BUSINESS_REGISTERED",
+      "BUSINESS_UNREGISTERED",
+      "RENTAL_INCOME",
+      "FREELANCE_INVOICE",
+      "INVESTMENT_INCOME",
+    ],
+    incomeRecognitionBps: {
+      PAYROLL_TRANSFER: 10000,
+      PAYROLL_CASH: 10000,
+      BUSINESS_REGISTERED: 10000,
+      BUSINESS_UNREGISTERED: 10000,
+      RENTAL_INCOME: 10000,
+      FREELANCE_INVOICE: 10000,
+      INVESTMENT_INCOME: 10000,
+    },
+    creditCardObligationBps: 0,
+    minEmploymentMonths: 0,
+    requiresLocalResidency: false,
+    provenance: {
+      sourceUrl: "",
+      sourceType: "MANUAL_ENTRY",
+      asOfDate: new Date().toISOString().slice(0, 10),
+      confidence: "LOW",
+      note: "Lãi suất do người dùng nhập cho mô phỏng, không phải báo giá của bên cho vay.",
+    },
+  };
+}
 
 const TIER_CLASS: Record<string, string> = {
   ROBUST: "good",
@@ -53,12 +108,10 @@ export default function AnalysisPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  const products = getAllProducts();
-  const product = products[0];
-
   const [f, setF] = useState({
     amount: sp.get("amount") || "2000000000",
     term: sp.get("term") || "240",
+    rate: sp.get("rate") || "",
     income: "45000000",
     expenses: "18000000",
     otherDebt: "4000000",
@@ -68,10 +121,21 @@ export default function AnalysisPage() {
     method: "ANNUITY" as AmortizationMethod,
   });
   const [report, setReport] = useState<SurvivabilityReport | null>(null);
+  const [rateError, setRateError] = useState("");
   const set = (k: string, v: string) => setF((o) => ({ ...o, [k]: v }));
 
+  const product = useMemo(() => {
+    const rate = NUM(f.rate);
+    return rate > 0 ? manualStressProduct(rate) : null;
+  }, [f.rate]);
+
   const run = () => {
-    if (!product) return;
+    if (!product) {
+      setRateError(t("err_rate_zero"));
+      setReport(null);
+      return;
+    }
+    setRateError("");
     const promoTier = product.promoTiers[0];
     const household: HouseholdInput = {
       initialSavingsVnd: NUM(f.savings),
@@ -126,6 +190,18 @@ export default function AnalysisPage() {
               <div className="glab">{t("g_loan")}</div>
               {numField("q_amount", "amount", 10000000)}
               {numField("q_term", "term", 6)}
+              <label className={`fq${rateError ? " fq-err" : ""}`}>
+                <span>{t("surv_rate")}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={f.rate}
+                  onChange={(e) => set("rate", e.target.value)}
+                  placeholder="Ví dụ: 8.5"
+                />
+                {rateError && <em className="field-err">⚠ {rateError}</em>}
+              </label>
               <label className="fq">
                 <span>{t("ana_method")}</span>
                 <select

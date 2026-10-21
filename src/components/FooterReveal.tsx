@@ -32,22 +32,30 @@ export default function FooterReveal({ children }: { children: React.ReactNode }
       const fh = el.offsetHeight;
       const vh = window.innerHeight;
       const fits = fh > 0 && fh <= vh - 24;
+      const mobile = window.matchMedia("(max-width: 760px)").matches;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       // scrollHeight already includes the slot, so compare against it directly
       const scrollable = document.documentElement.scrollHeight > vh + fh + 160;
       setHeight(fh);
-      setOn(fits && scrollable);
+      // A pinned curtain fights iOS Safari's dynamic viewport and keyboard.
+      // Keep the footer a normal flow element on phones and for users who ask
+      // for reduced motion; desktop retains the original reveal when safe.
+      setOn(!mobile && !reduced && fits && scrollable);
     };
 
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     window.addEventListener("resize", measure);
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    motion.addEventListener?.("change", measure);
     // Sections reveal on scroll and change the page height, so re-check once
     // things have settled.
     const t = setTimeout(measure, 800);
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", measure);
+      motion.removeEventListener?.("change", measure);
       clearTimeout(t);
     };
   }, []);

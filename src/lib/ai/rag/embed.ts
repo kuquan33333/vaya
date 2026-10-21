@@ -1,15 +1,21 @@
 import OpenAI from "openai";
-
-const DASHSCOPE_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+import { runtimeValue } from "@/lib/cloudflare/runtime";
+import { LLMNotConfiguredError } from "@/lib/ai/provider";
 
 function getEmbeddingClient(): OpenAI {
+  // DashScope supplies the embedding model used by D1 policy_chunks. Keep
+  // embeddings independent from the conversational provider so selecting
+  // DeepSeek for chat does not silently send an unsupported embedding request
+  // to the DeepSeek endpoint.
+  const apiKey = runtimeValue("DASHSCOPE_API_KEY");
+  if (!apiKey) throw new LLMNotConfiguredError();
   return new OpenAI({
-    apiKey: process.env.DASHSCOPE_API_KEY || "unset-configure-DASHSCOPE_API_KEY-in-.env",
-    baseURL: process.env.DASHSCOPE_BASE_URL || DASHSCOPE_BASE_URL,
+    apiKey,
+    baseURL:
+      runtimeValue("DASHSCOPE_BASE_URL") ??
+      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
   });
 }
-
-const EMBEDDING_MODEL = process.env.DASHSCOPE_EMBEDDING_MODEL ?? "text-embedding-v3";
 
 /**
  * Embed a single text string using DashScope text-embedding-v3.
@@ -17,7 +23,7 @@ const EMBEDDING_MODEL = process.env.DASHSCOPE_EMBEDDING_MODEL ?? "text-embedding
  */
 export async function embedText(text: string): Promise<number[]> {
   const response = await getEmbeddingClient().embeddings.create({
-    model: EMBEDDING_MODEL,
+    model: runtimeValue("DASHSCOPE_EMBEDDING_MODEL") ?? "text-embedding-v3",
     input: text,
   });
   return response.data[0].embedding;
