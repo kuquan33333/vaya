@@ -79,7 +79,17 @@ const gateway = {
         headers: { "Cache-Control": "no-store" },
       });
     }
-    const response = await env.APP.fetch(request);
+    // Some minimal HTTP clients omit Accept entirely. Vinext's route
+    // negotiation expects an HTML preference for document navigations; pass a
+    // normalized request without changing API or asset semantics.
+    const url = new URL(request.url);
+    let appRequest = request;
+    if (request.method === "GET" && !request.headers.has("Accept") && !url.pathname.startsWith("/api/")) {
+      const headers = new Headers(request.headers);
+      headers.set("Accept", "text/html,application/xhtml+xml");
+      appRequest = new Request(request, { headers });
+    }
+    const response = await env.APP.fetch(appRequest);
     return await normalizeStaticAssetResponse(request, response);
   },
 };
