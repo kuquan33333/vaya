@@ -17,18 +17,18 @@
 
 ## Secrets và quyền cần cung cấp
 
-GitHub Actions production/staging cần:
+GitHub Actions production/staging chỉ cần một credential:
 
 - `CLOUDFLARE_API_TOKEN`: token giới hạn trong account đích, có Workers Scripts
   Edit, Pages Edit, D1 Edit, Queues Edit và Account Settings Read nếu Wrangler
   yêu cầu; không cấp R2;
-- `CLOUDFLARE_ACCOUNT_ID`;
-- `CLOUDFLARE_D1_DATABASE_ID` của D1 production `vaytiendanang-db`;
-- `CLOUDFLARE_STAGING_D1_DATABASE_ID` của D1 staging;
-- `PUBLIC_SITE_URL=https://vaytiendanang.pages.dev`;
-- `STAGING_PUBLIC_SITE_URL` là URL gateway preview/staging dùng cho smoke test.
 
-Các tên trên phải được thêm tại GitHub repository **Settings → Secrets and
+Account ID, hai D1 ID và production/staging URL là các định danh tài nguyên
+không bí mật, đã được cố định trong workflow để không buộc người vận hành nhập
+lại chúng vào GitHub Secrets. Các secret runtime của ứng dụng vẫn được đặt trên
+Cloudflare Worker, không đưa vào GitHub.
+
+Chỉ thêm `CLOUDFLARE_API_TOKEN` tại GitHub repository **Settings → Secrets and
 variables → Actions**. Không ghi token vào source, workflow log hoặc file
 `.env` commit vào repository.
 

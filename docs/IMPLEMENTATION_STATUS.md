@@ -77,12 +77,11 @@ production-ready.
 
 ## BLOCKED — người vận hành phải cung cấp
 
-- GitHub Actions cần điền đúng sáu secret: `CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`,
-  `CLOUDFLARE_STAGING_D1_DATABASE_ID`, `PUBLIC_SITE_URL` và
-  `STAGING_PUBLIC_SITE_URL`, rồi chạy workflow dispatch `target=staging`
-  trước `target=production`. Token phải giới hạn account đích và có quyền
-  Workers Scripts Edit, Pages Edit, D1 Edit, Queues Edit (cộng Account
+- GitHub Actions cần `CLOUDFLARE_API_TOKEN` tại repository secret, rồi chạy
+  workflow dispatch `target=staging` trước `target=production`. Account ID,
+  D1 IDs và URL deploy là định danh công khai đã cố định trong workflow; không
+  cần đưa chúng vào GitHub Secrets. Token phải giới hạn account đích và có
+  quyền Workers Scripts Edit, Pages Edit, D1 Edit, Queues Edit (cộng Account
   Settings Read nếu Wrangler yêu cầu); không cần và không được cấp R2.
 - LLM key/model, Turnstile site/secret, Telegram bot token + allowlisted chat
   ID, `PUBLIC_SITE_URL`, Zalo HTTPS URL, Cloudflare Access team domain/audience
