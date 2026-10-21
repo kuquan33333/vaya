@@ -3,12 +3,10 @@ import { bindings, defineConfig, defineWorker } from "cf/config";
 const workerName = process.env.CF_APP_WORKER_NAME ?? "vaytiendanang";
 const databaseName = process.env.CF_D1_DATABASE_NAME ?? "vaytiendanang-db";
 const leadQueueName = process.env.CF_LEAD_QUEUE_NAME ?? "vaytiendanang-lead-notifications";
-const rateLimitSuffix = process.env.CF_RATE_LIMIT_SUFFIX ?? "";
-// Workers Rate Limit namespaces must be positive integer strings. Keep these
-// stable across deploys so counters are not reset by an arbitrary namespace
-// rename; the optional suffix remains useful for isolated preview accounts.
-const leadRateLimitNamespace = process.env.CF_LEAD_RATE_LIMIT_NAMESPACE ?? `57281401${rateLimitSuffix}`;
-const chatRateLimitNamespace = process.env.CF_CHAT_RATE_LIMIT_NAMESPACE ?? `57281402${rateLimitSuffix}`;
+// Workers Rate Limit namespace IDs must be positive integer strings. Keep
+// them explicit per environment; textual suffixes are rejected by Cloudflare.
+const leadRateLimitNamespace = process.env.CF_LEAD_RATE_LIMIT_NAMESPACE ?? "57281401";
+const chatRateLimitNamespace = process.env.CF_CHAT_RATE_LIMIT_NAMESPACE ?? "57281402";
 
 export default defineConfig({
   worker: defineWorker({

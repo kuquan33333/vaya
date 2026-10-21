@@ -71,7 +71,10 @@ jobs:
             echo "CF_D1_DATABASE_NAME=vaytiendanang-staging-db" >> "$GITHUB_ENV"
             echo "CF_LEAD_QUEUE_NAME=vaytiendanang-staging-lead-notifications" >> "$GITHUB_ENV"
             echo "CF_LEAD_QUEUE_DLQ_NAME=vaytiendanang-staging-lead-notifications-dlq" >> "$GITHUB_ENV"
-            echo "CF_RATE_LIMIT_SUFFIX=-staging" >> "$GITHUB_ENV"
+            # Rate Limit namespace IDs are numeric Cloudflare resource IDs;
+            # never append an environment label to them.
+            echo "CF_LEAD_RATE_LIMIT_NAMESPACE=57281403" >> "$GITHUB_ENV"
+            echo "CF_CHAT_RATE_LIMIT_NAMESPACE=57281404" >> "$GITHUB_ENV"
             echo "CLOUDFLARE_D1_DATABASE_ID=${STAGING_D1_ID}" >> "$GITHUB_ENV"
             echo "PUBLIC_SITE_URL=${STAGING_PUBLIC_SITE_URL}" >> "$GITHUB_ENV"
             echo "CLOUDFLARE_PAGES_CONFIG=preview" >> "$GITHUB_ENV"
@@ -83,7 +86,8 @@ jobs:
             echo "CF_D1_DATABASE_NAME=vaytiendanang-db" >> "$GITHUB_ENV"
             echo "CF_LEAD_QUEUE_NAME=vaytiendanang-lead-notifications" >> "$GITHUB_ENV"
             echo "CF_LEAD_QUEUE_DLQ_NAME=vaytiendanang-lead-notifications-dlq" >> "$GITHUB_ENV"
-            echo "CF_RATE_LIMIT_SUFFIX=" >> "$GITHUB_ENV"
+            echo "CF_LEAD_RATE_LIMIT_NAMESPACE=57281401" >> "$GITHUB_ENV"
+            echo "CF_CHAT_RATE_LIMIT_NAMESPACE=57281402" >> "$GITHUB_ENV"
             echo "CLOUDFLARE_D1_DATABASE_ID=${PRODUCTION_D1_ID}" >> "$GITHUB_ENV"
             echo "PUBLIC_SITE_URL=${PRODUCTION_PUBLIC_SITE_URL}" >> "$GITHUB_ENV"
             echo "CLOUDFLARE_PAGES_CONFIG=production" >> "$GITHUB_ENV"
