@@ -4,6 +4,11 @@ const workerName = process.env.CF_APP_WORKER_NAME ?? "vaytiendanang";
 const databaseName = process.env.CF_D1_DATABASE_NAME ?? "vaytiendanang-db";
 const leadQueueName = process.env.CF_LEAD_QUEUE_NAME ?? "vaytiendanang-lead-notifications";
 const rateLimitSuffix = process.env.CF_RATE_LIMIT_SUFFIX ?? "";
+// Workers Rate Limit namespaces must be positive integer strings. Keep these
+// stable across deploys so counters are not reset by an arbitrary namespace
+// rename; the optional suffix remains useful for isolated preview accounts.
+const leadRateLimitNamespace = process.env.CF_LEAD_RATE_LIMIT_NAMESPACE ?? `57281401${rateLimitSuffix}`;
+const chatRateLimitNamespace = process.env.CF_CHAT_RATE_LIMIT_NAMESPACE ?? `57281402${rateLimitSuffix}`;
 
 export default defineConfig({
   worker: defineWorker({
@@ -26,8 +31,8 @@ export default defineConfig({
       ASSETS: bindings.assets(),
       DB: bindings.d1({ name: databaseName }),
       LEAD_QUEUE: bindings.queue({ name: leadQueueName }),
-      LEAD_RATE_LIMIT: bindings.rateLimit({ namespace: `vaytiendanang-leads${rateLimitSuffix}`, simple: { limit: 5, period: 60 } }),
-      CHAT_RATE_LIMIT: bindings.rateLimit({ namespace: `vaytiendanang-chat${rateLimitSuffix}`, simple: { limit: 20, period: 60 } }),
+      LEAD_RATE_LIMIT: bindings.rateLimit({ namespace: leadRateLimitNamespace, simple: { limit: 5, period: 60 } }),
+      CHAT_RATE_LIMIT: bindings.rateLimit({ namespace: chatRateLimitNamespace, simple: { limit: 20, period: 60 } }),
       LLM_PROVIDER: bindings.text("qwen"),
       // Telegram is the only document delivery channel. The route still
       // fails closed until the bot token, chat id and signing key are set.
